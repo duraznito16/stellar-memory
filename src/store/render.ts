@@ -7,8 +7,10 @@
  */
 
 import type {
+  AssetData,
   ContractData,
   DeploymentData,
+  ErrorData,
   FunctionData,
   MemoryEdge,
   MemoryNode,
@@ -121,6 +123,10 @@ function renderKindDetail(node: MemoryNode, ctx: RenderContext): string {
       return renderStorage(node);
     case 'deployment':
       return renderDeployment(node);
+    case 'error':
+      return renderError(node);
+    case 'asset':
+      return renderAsset(node);
     case 'project':
       return renderProject(ctx.memory);
     default:
@@ -234,6 +240,53 @@ function renderDeployment(node: MemoryNode): string {
   if (data.meta && Object.keys(data.meta).length > 0) {
     lines.push('', '### Build metadata', '');
     for (const [k, v] of Object.entries(data.meta)) lines.push(`- \`${k}\`: ${v}`);
+  }
+  return lines.join('\n');
+}
+
+function renderError(node: MemoryNode): string {
+  const data = node.data as unknown as ErrorData | undefined;
+  if (!data?.variants?.length) return '';
+  const lines = [
+    '## Variants',
+    '',
+    'These discriminants are published ABI. A client matches on the integer, and a',
+    'failed invocation reaches the caller as `Error(Contract, #N)` — so renumbering',
+    'an existing variant breaks integrations without breaking the build.',
+    '',
+    '| Variant | Code |',
+    '|---|---:|',
+  ];
+  for (const v of [...data.variants].sort((a, b) => a.code - b.code)) {
+    lines.push(`| \`${v.name}\` | ${v.code} |`);
+  }
+  if (data.deployedMismatch) {
+    lines.push('', `> ⚠️ **Disagrees with the deployed contract:** ${data.deployedMismatch}`);
+  }
+  return lines.join('\n');
+}
+
+function renderAsset(node: MemoryNode): string {
+  const data = node.data as unknown as AssetData | undefined;
+  if (!data) return '';
+  const lines = ['## Value path', ''];
+
+  lines.push(
+    data.kind === 'stellar-asset'
+      ? '- Reached through a **Stellar Asset Contract client**, the administrative interface of an asset.'
+      : '- Reached through a **token client**.',
+  );
+
+  lines.push(
+    data.addressOrigin === 'storage'
+      ? `- Address is configured, read from \`${data.addressKey}\`.`
+      : data.addressOrigin === 'param'
+        ? '- ⚠️ Address is **supplied by the caller**, not read from storage — callers choose which contract this talks to.'
+        : '- Address origin could not be resolved.',
+  );
+
+  if (data.methods.length > 0) {
+    lines.push('', `**Methods this project calls:** ${data.methods.map((m) => `\`${m}\``).join(', ')}`);
   }
   return lines.join('\n');
 }

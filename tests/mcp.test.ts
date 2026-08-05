@@ -52,6 +52,7 @@ test('advertises the agent-facing toolset', async () => {
     'recent_changes',
     'search_memory',
     'storage_layout',
+    'value_surface',
   ]);
 
   // An agent chooses a tool from its description, so every tool needs one.
@@ -132,6 +133,28 @@ test('describe_node explains a node and its relationships', async () => {
   };
   assert.equal(parsed.node.title, 'Payroll');
   assert.ok(parsed.points_to.some((p) => p.relationship === 'calls' && p.title === 'Treasury'));
+});
+
+test('value_surface reports error discriminants as published ABI', async () => {
+  const body = textOf(await client.callTool({ name: 'value_surface', arguments: {} }));
+  const parsed = JSON.parse(body) as {
+    errors: { name: string; variants: { name: string; code: number }[]; raised_by: string[] }[];
+  };
+
+  const payrollError = parsed.errors.find((e) => e.name === 'PayrollError');
+  assert.ok(payrollError, 'PayrollError is present');
+  assert.deepEqual(
+    payrollError!.variants.sort((a, b) => a.code - b.code),
+    [
+      { name: 'NotAuthorized', code: 1 },
+      { name: 'UnknownEmployee', code: 2 },
+      { name: 'AlreadyPaidThisPeriod', code: 3 },
+      { name: 'NotInitialized', code: 4 },
+    ].sort((a, b) => a.code - b.code),
+  );
+
+  // `pay` returns Result<i128, PayrollError>, so the raises edge must exist.
+  assert.ok(payrollError!.raised_by.includes('pay'), 'the raises edge is emitted');
 });
 
 test('describe_node suggests alternatives for an unknown id', async () => {

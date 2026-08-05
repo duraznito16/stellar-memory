@@ -10,8 +10,10 @@
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type {
+  AssetData,
   ContractData,
   DeploymentData,
+  ErrorData,
   FunctionData,
   MemoryEdge,
   MemoryNode,
@@ -306,6 +308,62 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
           });
         }
 
+        // `raises`: the declared failure modes of this entry point. The return
+        // type names the error enum, so the edge is a literal match.
+        for (const error of analysis.errors) {
+          if (!fn.returns?.includes(error.name)) continue;
+          addEdge({
+            from: fnId,
+            to: `error:${error.name}`,
+            kind: 'raises',
+            provenance: [{ source: 'source', file: file.rel, line: fn.line }],
+          });
+        }
+
+        // Token and SAC clients come from the SDK, not from a workspace crate,
+        // so they never resolved to a contract node and were dropped — leaving
+        // no trace of where a project moves value.
+        for (const call of fn.contractCalls) {
+          if (call.kind === 'generated') continue;
+          const assetId = `asset:${call.client}.${call.addressKey ?? call.address ?? 'unknown'}`;
+          const assetData: AssetData = {
+            kind: call.kind,
+            addressOrigin: call.addressOrigin,
+            addressKey: call.addressKey,
+            methods: call.methods,
+          };
+          const existing = nodes.get(assetId)?.data as unknown as AssetData | undefined;
+          if (existing) {
+            assetData.methods = [...new Set([...existing.methods, ...call.methods])];
+          }
+          addNode({
+            id: assetId,
+            kind: 'asset',
+            title:
+              call.addressOrigin === 'storage'
+                ? `${call.client} at ${call.addressKey}`
+                : `${call.client} (${call.address ?? 'address unresolved'})`,
+            path: file.rel,
+            line: fn.line,
+            summary:
+              call.kind === 'stellar-asset'
+                ? 'Stellar Asset Contract client — the administrative interface of an asset.'
+                : 'Token contract this project moves value through.',
+            data: assetData as unknown as Record<string, unknown>,
+            provenance: [{ source: 'source', file: file.rel, line: fn.line }],
+          });
+          // Re-apply after the merge in addNode.
+          (nodes.get(assetId)!.data as unknown as AssetData).methods = assetData.methods;
+
+          addEdge({
+            from: fnId,
+            to: assetId,
+            kind: 'calls',
+            note: call.methods.length ? `calls \`${call.methods.join('`, `')}\`` : undefined,
+            provenance: [{ source: 'source', file: file.rel, line: fn.line }],
+          });
+        }
+
         for (const topic of fn.events) {
           const eventId = `event:${contract.name}.${topic}`;
           addNode({
@@ -339,13 +397,18 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
       });
     }
     for (const e of analysis.errors) {
+      const errorData: ErrorData = { variants: e.variants };
       addNode({
         id: `error:${e.name}`,
         kind: 'error',
         title: e.name,
         path: file.rel,
         line: e.line,
-        summary: 'Contract error enum (`#[contracterror]`).',
+        summary:
+          e.variants.length > 0
+            ? `Contract error enum with ${e.variants.length} variant${e.variants.length === 1 ? '' : 's'}. The discriminants are published ABI.`
+            : 'Contract error enum (`#[contracterror]`).',
+        data: errorData as unknown as Record<string, unknown>,
         provenance: [{ source: 'source', file: file.rel, line: e.line }],
       });
     }
@@ -900,6 +963,25 @@ async function recordDeployment(
     if (onlyOnChain.length > 0) {
       nodes.get(id)!.summary +=
         ` Exposes ${onlyOnChain.length} function${onlyOnChain.length === 1 ? '' : 's'} not found in local source.`;
+    }
+
+    // Error discriminants are ABI. Comparing the deployed spec against source
+    // catches a renumbered variant — a break that is otherwise invisible until
+    // a client starts misreporting failures.
+    for (const deployed of spec.errors) {
+      const sourceNode = nodes.get(`error:${deployed.name}`);
+      const sourceData = sourceNode?.data as unknown as ErrorData | undefined;
+      if (!sourceNode || !sourceData?.variants?.length || !deployed.cases?.length) continue;
+
+      const onChain = new Map(deployed.cases.map((c) => [c.name, c.value]));
+      const drifted = sourceData.variants.filter(
+        (v) => onChain.has(v.name) && onChain.get(v.name) !== v.code,
+      );
+      if (drifted.length > 0) {
+        sourceData.deployedMismatch = drifted
+          .map((v) => `${v.name} is ${v.code} in source but ${onChain.get(v.name)} on ${network}`)
+          .join('; ');
+      }
     }
   }
 

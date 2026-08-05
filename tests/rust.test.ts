@@ -387,6 +387,84 @@ impl Token {
   );
 });
 
+test('reads error variants and their published discriminants', () => {
+  const src = `
+use soroban_sdk::contracterror;
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum PayError {
+    NotAuthorized = 1,
+    Insufficient = 2,
+    NotInitialized = 4,
+}
+`;
+  const errors = analyseRustFile('e.rs', src).errors;
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0]!.name, 'PayError');
+  assert.deepEqual(errors[0]!.variants, [
+    { name: 'NotAuthorized', code: 1 },
+    { name: 'Insufficient', code: 2 },
+    { name: 'NotInitialized', code: 4 },
+  ]);
+});
+
+test('records token and SAC clients with their address origin and methods', () => {
+  // These come from the SDK rather than a workspace crate, so they never
+  // resolved to a contract node and were silently dropped — leaving a contract
+  // that moves real money with no trace of it in the graph.
+  const src = `
+use soroban_sdk::{contract, contractimpl, token, Address, Env};
+#[contract]
+pub struct P;
+#[contractimpl]
+impl P {
+    pub fn pay(env: Env, to: Address, amount: i128) {
+        let token_addr: Address = env.storage().instance().get(&DataKey::PayToken).unwrap();
+        let tok = token::TokenClient::new(&env, &token_addr);
+        tok.transfer(&env.current_contract_address(), &to, &amount);
+    }
+    pub fn seize(env: Env, from: Address, amount: i128, asset: Address) {
+        let sac = token::StellarAssetClient::new(&env, &asset);
+        sac.clawback(&from, &amount);
+    }
+}
+`;
+  const fns = analyseRustFile('p.rs', src).contracts[0]!.functions;
+
+  const pay = fns.find((f) => f.name === 'pay')!.contractCalls[0]!;
+  assert.equal(pay.kind, 'token');
+  assert.equal(pay.addressOrigin, 'storage', 'a configured token address');
+  assert.equal(pay.addressKey, 'DataKey::PayToken');
+  assert.deepEqual(pay.methods, ['transfer']);
+
+  const seize = fns.find((f) => f.name === 'seize')!.contractCalls[0]!;
+  assert.equal(seize.kind, 'stellar-asset');
+  assert.equal(seize.addressOrigin, 'param', 'the caller chooses the asset');
+  assert.deepEqual(seize.methods, ['clawback']);
+});
+
+test('a generated client is not mistaken for an SDK token client', () => {
+  const src = `
+use soroban_sdk::{contract, contractimpl, Address, Env};
+mod treasury { soroban_sdk::contractimport!(file = "t.wasm"); }
+#[contract]
+pub struct P;
+#[contractimpl]
+impl P {
+    pub fn draw(env: Env, to: Address) {
+        let id: Address = env.storage().instance().get(&DataKey::Treasury).unwrap();
+        let t = treasury::Client::new(&env, &id);
+        t.withdraw(&to);
+    }
+}
+`;
+  const call = analyseRustFile('p.rs', src).contracts[0]!.functions[0]!.contractCalls[0]!;
+  assert.equal(call.kind, 'generated');
+  assert.equal(call.client, 'treasury');
+  assert.deepEqual(call.methods, ['withdraw']);
+});
+
 test('a plain Rust file yields no contracts', () => {
   const a = analyseRustFile('src/util.rs', 'pub fn add(a: u32, b: u32) -> u32 { a + b }');
   assert.equal(a.contracts.length, 0);

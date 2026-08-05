@@ -5,7 +5,7 @@ title: Treasury
 path: contracts/treasury/src/lib.rs
 summary: Soroban contract with 5 public functions.
 first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-05T00:48:10.643Z
+last_changed: 2026-08-05T03:43:28.401Z
 tags:
   - stellar-memory
   - kind/contract
@@ -26,7 +26,7 @@ Soroban contract with 5 public functions.
 - `balance(env: Env, token: Address) -> i128` — [[functions/treasury.balance|balance]]
 - `payroll_address(env: Env) -> Result<Address, TreasuryError>` — [[functions/treasury.payroll_address|payroll_address]]
 
-**Local Wasm hash:** `0d9dd2b0dc1933c02685188fc4f4b65d9cfddc52a3aa962e765468ed5ce4a4d3`
+**Local Wasm hash:** `cb696a5f0f15c833d6b2f4b9a148dfd91b5eccb82bef0236ad83dd27b6305746`
 
 ## Connections
 

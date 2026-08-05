@@ -34,6 +34,9 @@ fn fund(env: Env, token: Address, amount: i128) -> Result<i128, TreasuryError>
 **Writes**
 - [[storage/treasury.persistent.datakey-balance-token|DataKey::Balance(token) (persistent)]] — `set`
 
+**Can fail with**
+- [[errors/treasuryerror|TreasuryError]]
+
 **Emits**
 - [[events/treasury.funded|funded]]
 

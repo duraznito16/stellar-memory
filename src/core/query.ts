@@ -7,8 +7,10 @@
  */
 
 import type {
+  AssetData,
   ContractData,
   DeploymentData,
+  ErrorData,
   FunctionData,
   MemoryEdge,
   MemoryNode,
@@ -337,6 +339,43 @@ export function signals(memory: ProjectMemory): Signal[] {
       (t) => (t.data as unknown as TestData | undefined)?.mocksAllAuths,
     );
   });
+
+  // Error discriminants that no longer match what is deployed. A client matching
+  // on the integer will misreport failures, and nothing about the build breaks.
+  for (const node of nodesOfKind(memory, 'error')) {
+    const data = node.data as unknown as ErrorData | undefined;
+    if (data?.deployedMismatch) {
+      out.push({
+        severity: 'warn',
+        message: `${node.title} discriminants disagree with the deployed contract: ${data.deployedMismatch}.`,
+        nodeId: node.id,
+      });
+    }
+  }
+
+  // Where the project moves value. Report what was observed and nothing more:
+  // seeing `clawback` named in a source file does not establish that this
+  // contract holds the asset's admin key.
+  for (const node of nodesOfKind(memory, 'asset')) {
+    const data = node.data as unknown as AssetData | undefined;
+    if (!data) continue;
+    const admin = data.methods.filter((m) =>
+      ['mint', 'clawback', 'set_admin', 'set_authorized', 'burn_from'].includes(m),
+    );
+    if (data.kind === 'stellar-asset' && admin.length > 0) {
+      out.push({
+        severity: 'warn',
+        message:
+          `${node.title} is reached through a Stellar Asset Contract client and this project ` +
+          `names ${admin.map((m) => `\`${m}\``).join(', ')} on it — administrative token operations.`,
+        nodeId: node.id,
+      });
+    }
+    // A caller-supplied token address is not a defect on its own — a generic
+    // transfer helper takes one by design. It is recorded on the asset's note,
+    // where a reader has the surrounding context, rather than raised as a
+    // project-level warning that would fire on ordinary code.
+  }
 
   if (ungated.length > 0) {
     const names = ungated.map((c) => c.node.title).join(', ');

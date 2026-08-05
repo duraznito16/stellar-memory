@@ -38,11 +38,18 @@ export interface SpecEvent {
   data_format?: string;
 }
 
+export interface SpecErrorCase {
+  doc?: string;
+  name: string;
+  value: number;
+}
+
 export interface SpecUdt {
   doc?: string;
   lib?: string;
   name: string;
-  cases?: unknown[];
+  /** For `udt_error_enum_v0`, the variants and their wire discriminants. */
+  cases?: SpecErrorCase[];
   fields?: unknown[];
 }
 

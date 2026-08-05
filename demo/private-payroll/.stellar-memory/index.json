@@ -726,7 +726,27 @@
       "title": "PayrollError",
       "path": "contracts/payroll/src/lib.rs",
       "line": 28,
-      "summary": "Contract error enum (`#[contracterror]`).",
+      "summary": "Contract error enum with 4 variants. The discriminants are published ABI.",
+      "data": {
+        "variants": [
+          {
+            "name": "NotAuthorized",
+            "code": 1
+          },
+          {
+            "name": "UnknownEmployee",
+            "code": 2
+          },
+          {
+            "name": "AlreadyPaidThisPeriod",
+            "code": 3
+          },
+          {
+            "name": "NotInitialized",
+            "code": 4
+          }
+        ]
+      },
       "provenance": [
         {
           "source": "source",
@@ -735,7 +755,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
+      "lastChanged": "2026-08-05T03:42:03.854Z"
     },
     {
       "id": "test:contracts/payroll/src/test.rs",
@@ -777,7 +797,7 @@
           "payroll_address"
         ],
         "wasmPath": "target/wasm32v1-none/release/treasury.wasm",
-        "localWasmHash": "0d9dd2b0dc1933c02685188fc4f4b65d9cfddc52a3aa962e765468ed5ce4a4d3"
+        "localWasmHash": "cb696a5f0f15c833d6b2f4b9a148dfd91b5eccb82bef0236ad83dd27b6305746"
       },
       "provenance": [
         {
@@ -791,7 +811,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T00:48:10.643Z"
+      "lastChanged": "2026-08-05T03:43:28.401Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -885,7 +905,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 94
+          "line": 98
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -979,7 +999,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 86
+          "line": 90
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -1050,6 +1070,30 @@
       "lastChanged": "2026-08-05T02:30:56.473Z"
     },
     {
+      "id": "asset:Token.token",
+      "kind": "asset",
+      "title": "Token (token)",
+      "path": "contracts/treasury/src/lib.rs",
+      "line": 56,
+      "summary": "Token contract this project moves value through.",
+      "data": {
+        "kind": "token",
+        "addressOrigin": "param",
+        "methods": [
+          "transfer"
+        ]
+      },
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 56
+        }
+      ],
+      "firstSeen": "2026-08-05T03:43:28.401Z",
+      "lastChanged": "2026-08-05T03:43:28.401Z"
+    },
+    {
       "id": "event:Treasury.withdrawn",
       "kind": "event",
       "title": "withdrawn",
@@ -1071,7 +1115,7 @@
       "kind": "function",
       "title": "balance",
       "path": "contracts/treasury/src/lib.rs",
-      "line": 85,
+      "line": 89,
       "data": {
         "params": [
           {
@@ -1091,7 +1135,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 85
+          "line": 89
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -1102,7 +1146,7 @@
       "kind": "function",
       "title": "payroll_address",
       "path": "contracts/treasury/src/lib.rs",
-      "line": 93,
+      "line": 97,
       "data": {
         "params": [
           {
@@ -1118,7 +1162,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 93
+          "line": 97
         }
       ],
       "firstSeen": "2026-08-05T00:48:10.643Z",
@@ -1130,7 +1174,23 @@
       "title": "TreasuryError",
       "path": "contracts/treasury/src/lib.rs",
       "line": 15,
-      "summary": "Contract error enum (`#[contracterror]`).",
+      "summary": "Contract error enum with 3 variants. The discriminants are published ABI.",
+      "data": {
+        "variants": [
+          {
+            "name": "NotAuthorized",
+            "code": 1
+          },
+          {
+            "name": "InsufficientFunds",
+            "code": 2
+          },
+          {
+            "name": "NotInitialized",
+            "code": 3
+          }
+        ]
+      },
       "provenance": [
         {
           "source": "source",
@@ -1139,7 +1199,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
+      "lastChanged": "2026-08-05T03:42:03.854Z"
     },
     {
       "id": "test:contracts/treasury/src/test.rs",
@@ -1463,18 +1523,18 @@
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
         "branch": "master",
-        "head": "10cef918e5629c1a3e4a0bed888a04f385e149bb",
-        "lastCommitDate": "2026-08-04T21:54:15-05:00",
-        "dirtyFiles": 5
+        "head": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b",
+        "lastCommitDate": "2026-08-04T22:07:20-05:00",
+        "dirtyFiles": 19
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "10cef918e5629c1a3e4a0bed888a04f385e149bb"
+          "ref": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T03:06:30.340Z"
+      "lastChanged": "2026-08-05T03:43:28.401Z"
     }
   ],
   "edges": [
@@ -1803,6 +1863,18 @@
     },
     {
       "from": "function:Payroll.pay",
+      "to": "error:PayrollError",
+      "kind": "raises",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/payroll/src/lib.rs",
+          "line": 58
+        }
+      ]
+    },
+    {
+      "from": "function:Payroll.pay",
       "to": "event:Payroll.paid",
       "kind": "emits",
       "provenance": [
@@ -1977,6 +2049,18 @@
     },
     {
       "from": "function:Treasury.fund",
+      "to": "error:TreasuryError",
+      "kind": "raises",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 37
+        }
+      ]
+    },
+    {
+      "from": "function:Treasury.fund",
       "to": "event:Treasury.funded",
       "kind": "emits",
       "provenance": [
@@ -2040,6 +2124,31 @@
     },
     {
       "from": "function:Treasury.withdraw",
+      "to": "error:TreasuryError",
+      "kind": "raises",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 56
+        }
+      ]
+    },
+    {
+      "from": "function:Treasury.withdraw",
+      "to": "asset:Token.token",
+      "kind": "calls",
+      "note": "calls `transfer`",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 56
+        }
+      ]
+    },
+    {
+      "from": "function:Treasury.withdraw",
       "to": "event:Treasury.withdrawn",
       "kind": "emits",
       "provenance": [
@@ -2058,7 +2167,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 85
+          "line": 89
         }
       ]
     },
@@ -2071,7 +2180,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 86
+          "line": 90
         }
       ]
     },
@@ -2083,7 +2192,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 93
+          "line": 97
         }
       ]
     },
@@ -2096,7 +2205,19 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 94
+          "line": 98
+        }
+      ]
+    },
+    {
+      "from": "function:Treasury.payroll_address",
+      "to": "error:TreasuryError",
+      "kind": "raises",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 97
         }
       ]
     },
@@ -2410,6 +2531,28 @@
       "nodeCount": 52,
       "edgeCount": 68,
       "changed": [
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T03:42:03.854Z",
+      "commit": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b",
+      "nodeCount": 52,
+      "edgeCount": 72,
+      "changed": [
+        "error:PayrollError",
+        "error:TreasuryError",
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T03:43:28.401Z",
+      "commit": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b",
+      "nodeCount": 53,
+      "edgeCount": 73,
+      "changed": [
+        "contract:Treasury",
+        "asset:Token.token",
         "project:private-payroll"
       ]
     }

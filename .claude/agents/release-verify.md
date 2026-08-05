@@ -37,6 +37,9 @@ cd ../..
 Check these specifics, not just exit codes:
 
 - **3 contracts** detected: `Payroll`, `Treasury`, `EmployeeRegistry`.
+- **8 MCP tools** advertised, including `value_surface`.
+- `value_surface` reports `PayrollError` with variants 1–4 and `pay` among its `raised_by`, and
+  one `asset` node for the `TokenClient` in `Treasury.withdraw`.
 - `graph` shows **`Payroll calls Treasury` and `Payroll calls EmployeeRegistry`**. Losing an edge
   means cross-contract resolution regressed.
 - `resume --json` reports **exactly these seven warnings** — no more, no fewer. Read them from the

@@ -35,7 +35,9 @@ export type NodeKind =
   /** Human-authored rationale: why something is the way it is. */
   | 'decision'
   /** Something known to be pending. */
-  | 'task';
+  | 'task'
+  /** A token or Stellar Asset Contract this project moves value through. */
+  | 'asset';
 
 export type EdgeKind =
   /** Structural containment: crate defines contract, contract defines function. */
@@ -134,6 +136,26 @@ export interface AuthSubjectData {
   /** For `storage` origin, the key the address was loaded from. */
   key?: string;
   forArgs: boolean;
+}
+
+export interface ErrorData {
+  /**
+   * Variants and their discriminants. These are published ABI — a client
+   * matches on the integer, so renumbering one silently breaks integrations.
+   */
+  variants: { name: string; code: number }[];
+  /** Set when the deployed contract's spec disagrees with this source. */
+  deployedMismatch?: string;
+}
+
+export interface AssetData {
+  /** How the client was obtained: an SDK token client, a SAC client, or generated. */
+  kind: 'token' | 'stellar-asset' | 'generated';
+  /** Where the contract address comes from: caller-supplied or configured. */
+  addressOrigin: AuthOrigin;
+  addressKey?: string;
+  /** Methods this project invokes on it. */
+  methods: string[];
 }
 
 export interface TestData {

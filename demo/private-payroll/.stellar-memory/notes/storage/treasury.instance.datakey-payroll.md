@@ -36,7 +36,7 @@ tags:
 
 - Parsed from `contracts/treasury/src/lib.rs:33`
 - Parsed from `contracts/treasury/src/lib.rs:63`
-- Parsed from `contracts/treasury/src/lib.rs:94`
+- Parsed from `contracts/treasury/src/lib.rs:98`
 
 </details>
 <!-- /stellar-memory:auto -->

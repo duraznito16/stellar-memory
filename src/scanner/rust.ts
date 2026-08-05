@@ -79,6 +79,8 @@ export interface FunctionDecl {
   events: string[];
   /** Contract client types constructed in this body — evidence of cross-contract calls. */
   clientCalls: string[];
+  /** The same calls with their target address and the methods invoked on them. */
+  contractCalls: ContractCall[];
   /** True when this function calls `update_current_contract_wasm`. */
   upgradesContract: boolean;
 }
@@ -95,6 +97,31 @@ export interface ContractDecl {
   upgradeFn?: string;
 }
 
+/**
+ * What kind of contract is on the other end of a client call.
+ *
+ * `TokenClient` and `StellarAssetClient` come from the SDK rather than from a
+ * `contractimport!`, so they never resolve to a crate in the workspace. Dropping
+ * them — which is what happened before — meant a contract that moves real money
+ * through the SDK token client left no trace in the graph at all.
+ */
+export type ClientKind = 'generated' | 'token' | 'stellar-asset';
+
+export interface ContractCall {
+  /** The client type or module as written, e.g. `treasury`, `Token`. */
+  client: string;
+  kind: ClientKind;
+  /** The address expression passed to `::new`, e.g. `treasury_id`. */
+  address?: string;
+  /** Where that address came from, resolved the same way auth subjects are. */
+  addressOrigin: AuthOrigin;
+  /** For a storage-sourced address, the key it was loaded from. */
+  addressKey?: string;
+  /** Methods invoked on the constructed client. */
+  methods: string[];
+  line: number;
+}
+
 export interface ImportDecl {
   /** The `mod` wrapping the import, when present — usually the callee's name. */
   module?: string;
@@ -108,13 +135,23 @@ export interface NamedDecl {
   line: number;
 }
 
+/** One variant of a `#[contracterror]` enum, with its wire discriminant. */
+export interface ErrorVariant {
+  name: string;
+  code: number;
+}
+
+export interface ErrorDecl extends NamedDecl {
+  variants: ErrorVariant[];
+}
+
 export interface RustFileAnalysis {
   rel: string;
   contracts: ContractDecl[];
   /** `#[contracttype]` structs and enums. */
   types: NamedDecl[];
-  /** `#[contracterror]` enums. */
-  errors: NamedDecl[];
+  /** `#[contracterror]` enums, with their variants and discriminants. */
+  errors: ErrorDecl[];
   /** `#[contractevent]` structs. */
   events: NamedDecl[];
   imports: ImportDecl[];
@@ -146,7 +183,7 @@ export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
     rel,
     contracts: [],
     types: collectAttributed(src, 'contracttype'),
-    errors: collectAttributed(src, 'contracterror'),
+    errors: collectErrorEnums(src),
     events: collectAttributed(src, 'contractevent'),
     imports: collectImports(src),
     // `#![cfg(test)]` (inner) is as common as `#[cfg(test)]` (outer) at the top
@@ -336,6 +373,45 @@ function collectContractNames(src: string): NamedDecl[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     if (m[1]) out.push({ name: m[1], line: lineAt(src, m.index) });
+  }
+  return out;
+}
+
+/**
+ * `#[contracterror]` enums, opened up to their variants.
+ *
+ * The discriminants are published ABI: a client matches on the integer, and a
+ * failed invocation surfaces to the caller as `Error(Contract, #2)`. Recording
+ * them means renumbering a variant shows up as a changed node on the next scan,
+ * which is the kind of break that is otherwise invisible until an integration
+ * starts misreporting failures.
+ */
+function collectErrorEnums(src: string): ErrorDecl[] {
+  const out: ErrorDecl[] = [];
+  const re =
+    /#\[contracterror(?:\([^)]*\))?\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?enum\s+(\w+)/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    const name = m[1];
+    if (!name) continue;
+
+    const brace = src.indexOf('{', m.index + m[0].length);
+    const variants: ErrorVariant[] = [];
+    if (brace !== -1) {
+      const body = src.slice(brace + 1, matchBrace(src, brace) - 1);
+      // Soroban requires an explicit discriminant on every variant, so a
+      // variant without one is not part of the wire contract.
+      const variantRe = /(\w+)\s*=\s*(\d+)/g;
+      let v: RegExpExecArray | null;
+      while ((v = variantRe.exec(body)) !== null) {
+        const variantName = v[1];
+        const code = Number(v[2]);
+        if (variantName && Number.isFinite(code)) variants.push({ name: variantName, code });
+      }
+    }
+
+    out.push({ name, line: lineAt(src, m.index), variants });
   }
   return out;
 }
@@ -539,10 +615,11 @@ function parseImplFunctions(
       events: [...parseEvents(fnBody), ...called.flatMap(([, helper]) => helper.events)],
       clientCalls: [
         ...new Set([
-          ...parseClientCalls(fnBody),
+          ...parseContractCalls(fnBody, params, helpers).map((c) => c.client),
           ...called.flatMap(([, helper]) => helper.clientCalls),
         ]),
       ],
+      contractCalls: parseContractCalls(fnBody, params, helpers),
       upgradesContract: /\bupdate_current_contract_wasm\s*\(/.test(fnBody),
     });
   }
@@ -806,16 +883,117 @@ function eventName(topicExpression: string): string {
 }
 
 function parseClientCalls(fnBody: string): string[] {
+  return [...new Set(parseContractCalls(fnBody, [], new Map()).map((c) => c.client))];
+}
+
+/**
+ * Every contract client constructed in this body, with the address it targets
+ * and the methods called on it.
+ *
+ * The address matters as much as the callee: a token address read from storage
+ * is configuration, while one taken as a parameter is chosen by the caller —
+ * the same distinction that makes `require_auth` meaningful or meaningless.
+ */
+function parseContractCalls(
+  fnBody: string,
+  params: { name: string; type: string }[],
+  helpers: Map<string, HelperFn>,
+): ContractCall[] {
+  const out: ContractCall[] = [];
+  const bindings = collectLetBindings(fnBody);
+  const paramNames = new Set(params.map((p) => p.name));
+
+  // `foo::Client::new(`, `FooClient::new(`, `token::TokenClient::new(`
+  const re = /\b(?:(\w+)\s*::\s*)?(\w*Client)\s*::\s*new\s*\(/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(fnBody)) !== null) {
+    const modulePath = m[1];
+    const clientType = m[2] ?? 'Client';
+
+    // Which contract is this? The type's own prefix is the most specific name —
+    // `token::StellarAssetClient` is a SAC client, not "the token module". A
+    // bare `Client` carries no prefix, so there the module path is the name.
+    const bare = clientType.replace(/Client$/, '');
+    const client = bare || modulePath || clientType;
+
+    let kind: ClientKind = 'generated';
+    if (/^StellarAsset$/i.test(bare) || /^stellar_?asset$/i.test(client)) kind = 'stellar-asset';
+    else if (/^Token$/i.test(bare) || /^token$/i.test(client)) kind = 'token';
+
+    const open = m.index + m[0].length - 1;
+    const close = matchParen(fnBody, open);
+    const args = splitTopLevel(fnBody.slice(open + 1, close - 1), ',');
+    // `::new(&env, &address)` — the address is the second argument.
+    const address = args[1]?.trim().replace(/^&/, '').replace(/\.clone\s*\(\s*\)/g, '').trim();
+
+    let addressOrigin: AuthOrigin = 'unknown';
+    let addressKey: string | undefined;
+    if (address) {
+      const root = address.split(/[.:]/)[0]?.trim() ?? address;
+      if (paramNames.has(root)) {
+        addressOrigin = 'param';
+      } else {
+        const resolved = resolveStorageBinding(root, bindings, helpers);
+        if (resolved) {
+          addressOrigin = 'storage';
+          addressKey = resolved;
+        }
+      }
+    }
+
+    out.push({
+      client,
+      kind,
+      address: address || undefined,
+      addressOrigin,
+      addressKey,
+      methods: methodsCalledOn(fnBody, bindingNameAt(fnBody, m.index)),
+      line: countNewlines(fnBody.slice(0, m.index)),
+    });
+  }
+
+  return out;
+}
+
+/** `let client = X::new(…)` — the name the constructed client was bound to. */
+function bindingNameAt(fnBody: string, callIndex: number): string | undefined {
+  const before = fnBody.slice(Math.max(0, callIndex - 200), callIndex);
+  const m = /\blet\s+(?:mut\s+)?(\w+)\s*(?::\s*[^=;]+)?=\s*$/.exec(before);
+  return m?.[1];
+}
+
+/** Methods invoked on a bound client, e.g. `client.withdraw(...)`. */
+function methodsCalledOn(fnBody: string, binding: string | undefined): string[] {
+  if (!binding) return [];
   const out = new Set<string>();
-  // `contractimport!` generates `Client`, conventionally used as `foo::Client::new(...)`
-  // or via a re-export as `FooClient::new(...)`.
-  const re = /\b(\w+)\s*::\s*Client\s*::\s*new\s*\(|\b(\w+)Client\s*::\s*new\s*\(/g;
+  const re = new RegExp(`\\b${binding}\\s*\\.\\s*(\\w+)\\s*\\(`, 'g');
   let m: RegExpExecArray | null;
   while ((m = re.exec(fnBody)) !== null) {
-    const name = m[1] ?? m[2];
-    if (name) out.add(name);
+    if (m[1]) out.add(m[1]);
   }
   return [...out];
+}
+
+/** Resolve a local binding to the storage key it was loaded from, if any. */
+function resolveStorageBinding(
+  root: string,
+  bindings: Map<string, string>,
+  helpers: Map<string, HelperFn>,
+): string | undefined {
+  const bound = bindings.get(root);
+  if (!bound) return undefined;
+
+  const direct =
+    /storage\s*\(\s*\)\s*\.\s*\w+\s*\(\s*\)\s*\.\s*(?:get|try_get)\s*(?:::\s*<[^>]*>\s*)?\(\s*&?\s*([^,)]+)/.exec(
+      bound,
+    );
+  if (direct?.[1]) {
+    return direct[1].replace(/\.clone\s*\(\s*\)/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  const call = /^\s*(\w+)\s*\(/.exec(bound);
+  return call?.[1] ? helpers.get(call[1])?.returnsStorageKey : undefined;
 }
 
 function countNewlines(text: string): number {

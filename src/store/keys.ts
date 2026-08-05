@@ -24,6 +24,7 @@ export const KIND_FOLDER: Record<NodeKind, string> = {
   doc: 'docs',
   decision: 'decisions',
   task: 'tasks',
+  asset: 'assets',
 };
 
 export function slugify(value: string): string {

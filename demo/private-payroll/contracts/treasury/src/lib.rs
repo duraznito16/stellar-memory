@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, token, Address, Env, Symbol};
 
 #[contracttype]
 #[derive(Clone)]
@@ -75,6 +75,10 @@ impl Treasury {
         let remaining = current - amount;
         env.storage().persistent().set(&key, &remaining);
         env.storage().persistent().extend_ttl(&key, 100_000, 200_000);
+
+        // Actually move the funds. Everything above is bookkeeping.
+        let client = token::TokenClient::new(&env, &token);
+        client.transfer(&env.current_contract_address(), &to, &amount);
 
         env.events()
             .publish((Symbol::new(&env, "withdrawn"), to), amount);

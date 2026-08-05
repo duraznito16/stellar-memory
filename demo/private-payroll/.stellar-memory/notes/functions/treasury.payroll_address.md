@@ -13,7 +13,7 @@ tags:
 <!-- stellar-memory:auto -->
 # payroll_address
 
-**Source:** `contracts/treasury/src/lib.rs:93`
+**Source:** `contracts/treasury/src/lib.rs:97`
 
 ## Signature
 
@@ -26,6 +26,9 @@ fn payroll_address(env: Env) -> Result<Address, TreasuryError>
 **Reads**
 - [[storage/treasury.instance.datakey-payroll|DataKey::Payroll (instance)]] — `get`
 
+**Can fail with**
+- [[errors/treasuryerror|TreasuryError]]
+
 **Defined in**
 - [[contracts/treasury|Treasury]]
 
@@ -33,7 +36,7 @@ fn payroll_address(env: Env) -> Result<Address, TreasuryError>
 
 <details><summary>Where this came from</summary>
 
-- Parsed from `contracts/treasury/src/lib.rs:93`
+- Parsed from `contracts/treasury/src/lib.rs:97`
 
 </details>
 <!-- /stellar-memory:auto -->

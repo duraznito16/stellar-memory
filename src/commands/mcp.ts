@@ -25,7 +25,14 @@ import {
   signals,
   suggestIds,
 } from '../core/query.js';
-import type { DeploymentData, FunctionData, ProjectMemory, StorageData } from '../core/types.js';
+import type {
+  AssetData,
+  DeploymentData,
+  ErrorData,
+  FunctionData,
+  ProjectMemory,
+  StorageData,
+} from '../core/types.js';
 import { note, dim } from '../ui/out.js';
 
 export interface McpOptions {
@@ -225,6 +232,47 @@ export async function runMcp(options: McpOptions): Promise<void> {
           };
         }),
       );
+    },
+  );
+
+  server.registerTool(
+    'value_surface',
+    {
+      title: 'Where this project moves value, and how it can fail',
+      description:
+        'The token and Stellar Asset Contract clients this project calls — which methods it ' +
+        'invokes on them, and whether each address is configured in storage or supplied by the ' +
+        'caller. Also the contract error enums with their published discriminants, which clients ' +
+        'match on. Call this before changing anything that transfers funds or returns an error.',
+    },
+    async () => {
+      const memory = await load();
+      return json({
+        assets: nodesOfKind(memory, 'asset').map((node) => {
+          const data = node.data as unknown as AssetData | undefined;
+          const hood = neighbourhood(memory, node.id);
+          return {
+            id: node.id,
+            title: node.title,
+            kind: data?.kind,
+            address_origin: data?.addressOrigin,
+            address_key: data?.addressKey,
+            methods_called: data?.methods ?? [],
+            called_from: hood?.incoming.filter((i) => i.edge.kind === 'calls').map((i) => i.node.title) ?? [],
+          };
+        }),
+        errors: nodesOfKind(memory, 'error').map((node) => {
+          const data = node.data as unknown as ErrorData | undefined;
+          const hood = neighbourhood(memory, node.id);
+          return {
+            id: node.id,
+            name: node.title,
+            variants: data?.variants ?? [],
+            disagrees_with_deployed: data?.deployedMismatch,
+            raised_by: hood?.incoming.filter((i) => i.edge.kind === 'raises').map((i) => i.node.title) ?? [],
+          };
+        }),
+      });
     },
   );
 

@@ -66,6 +66,15 @@ reads the things only a Soroban project has:
   memory records the subject and where it came from.
 - **Upgradeability.** Whether a contract can replace its own code, and through
   which function. It is the fact that gates every other decision about it.
+- **Error codes as published ABI.** Every `#[contracterror]` variant with its
+  discriminant, and which functions can raise it. Clients match on the integer —
+  a failed call reaches them as `Error(Contract, #2)` — so renumbering a variant
+  breaks integrations without breaking the build. Scans compare the source
+  discriminants against the deployed spec.
+- **Where value moves.** Token and Stellar Asset Contract clients are not
+  workspace crates, so nothing links them to a source file. The memory records
+  each one, the methods called on it, and whether its address is configured in
+  storage or supplied by the caller.
 
 ## Two front doors, one index
 
@@ -94,9 +103,9 @@ stellar memory graph --format mermaid       # paste the map into a PR
 ```
 
 The server exposes `project_overview`, `search_memory`, `describe_node`,
-`list_contracts`, `storage_layout`, `project_signals` and `recent_changes` — so
-an agent can orient itself in a Soroban codebase before touching it, instead of
-grepping blindly.
+`list_contracts`, `storage_layout`, `value_surface`, `project_signals` and
+`recent_changes` — so an agent can orient itself in a Soroban codebase before
+touching it, instead of grepping blindly.
 
 ## It ships the agents, not just the data
 
