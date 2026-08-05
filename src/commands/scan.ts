@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { scanProject } from '../scanner/scan.js';
 import { isInitialised, saveMemory, tryLoadMemory } from '../store/vault.js';
+import { runInit } from './init.js';
 import { out, success, warn, dim, progressReporter, bold } from '../ui/out.js';
 
 export interface ScanOptions {
@@ -13,10 +14,10 @@ export interface ScanOptions {
 export async function runScan(options: ScanOptions): Promise<void> {
   const root = path.resolve(options.cwd);
 
+  // Requiring `init` before `scan` was a step that taught nothing: there is
+  // exactly one sensible thing to do when the vault is missing, so do it.
   if (!(await isInitialised(root))) {
-    warn('No vault here yet. Run `stellar-memory init` first.');
-    process.exitCode = 1;
-    return;
+    await runInit({ cwd: root, quiet: true });
   }
 
   const previous = await tryLoadMemory(root);

@@ -1,0 +1,94 @@
+# Keep the project memory current, and fail a pull request that ships a real
+# problem in the contracts.
+#
+# Copy this to .github/workflows/ in your Soroban project.
+#
+# What it catches that a normal test suite does not:
+#   - the Wasm deployed on testnet no longer matching the source on this branch
+#   - a state-changing entry point with no effective authorization
+#   - a persistent storage key whose TTL is never extended
+#   - error discriminants that disagree with the deployed contract
+#
+# The offline scan needs neither network nor secrets. Drift detection needs the
+# `stellar` CLI and a network, so that job is separate and skipped on forks,
+# where secrets are unavailable.
+
+name: stellar-memory
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  memory:
+    name: Project memory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `resume` reports what changed since the last scan, which needs history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install stellar-memory
+        run: npm install -g soroban-memory
+
+      # Works with no network and no toolchain. Everything below is source-level.
+      - name: Scan
+        run: stellar-memory scan --offline
+
+      # Fails the build on the categories that mean something is broken rather
+      # than merely worth knowing. Widen with --fail-on all once the project is
+      # clean, or narrow it while you work through a backlog.
+      - name: Check
+        run: stellar-memory check --fail-on auth,ttl
+
+      # A readable summary on the PR itself, so a reviewer sees the contract
+      # surface without checking out the branch.
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Project memory'
+            echo
+            stellar-memory resume || true
+            echo
+            echo '### Architecture'
+            echo '```mermaid'
+            stellar-memory graph --format mermaid || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  drift:
+    name: On-chain drift
+    runs-on: ubuntu-latest
+    # Forks cannot read secrets, and there is nothing useful to check without a
+    # network, so skip rather than fail confusingly.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the Stellar CLI
+        run: |
+          curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install stellar-memory
+        run: npm install -g soroban-memory
+
+      # Contract aliases live in .stellar/contract-ids/ and are committed with
+      # the project, so this resolves deployments without any credentials.
+      # Every call this tool makes is read-only: it never signs or deploys.
+      - name: Scan against the network
+        run: stellar-memory scan --network testnet
+
+      - name: Fail if what is deployed no longer matches this branch
+        run: stellar-memory check --fail-on drift,abi

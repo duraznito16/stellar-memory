@@ -10,6 +10,8 @@ export interface InitOptions {
   force?: boolean;
   /** Also scaffold a team of Claude Code subagents wired to this project's memory. */
   withAgents?: boolean;
+  /** Suppress the "what to do next" hints — set when another command called this. */
+  quiet?: boolean;
 }
 
 const README = `# Project memory
@@ -55,6 +57,8 @@ export async function runInit(options: InitOptions): Promise<void> {
   await saveIndex(emptyMemory(name, root));
 
   success(`Created ${VAULT_DIR}/ for ${bold(name)}`);
+
+  if (options.quiet && !options.withAgents) return;
 
   if (options.withAgents) {
     const { agents, mcp } = await scaffoldAgents(root);

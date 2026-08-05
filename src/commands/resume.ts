@@ -32,6 +32,17 @@ export async function runResume(options: ResumeOptions): Promise<void> {
   const report = resumeReport(memory, now);
   const git = await readGitInfo(root);
 
+  // A briefing built on a stale index is worse than no briefing: it reads as
+  // current and is not. Say so before anything else.
+  const lastScan = memory.scans[memory.scans.length - 1];
+  const scannedCommit = lastScan?.commit;
+  if (git.isRepo && git.head && scannedCommit && git.head !== scannedCommit) {
+    warn(
+      `This memory was built at commit ${scannedCommit.slice(0, 7)} and HEAD is now ` +
+        `${git.head.slice(0, 7)}. Run \`stellar-memory scan\` for a current picture.`,
+    );
+  }
+
   if (options.json) {
     out(JSON.stringify({ ...report, git: { branch: git.branch, head: git.head } }, null, 2));
     return;

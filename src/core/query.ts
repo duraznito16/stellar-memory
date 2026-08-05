@@ -225,8 +225,31 @@ export function architecture(memory: ProjectMemory): ArchitectureView {
  * Health signals
  * ------------------------------------------------------------------ */
 
+/**
+ * What kind of problem a signal reports. Machine-filterable so a CI gate can
+ * fail on the categories a team actually cares about rather than all or nothing.
+ */
+export type SignalCategory =
+  /** Deployed Wasm no longer matches local source. */
+  | 'drift'
+  /** Persistent storage that can expire and become unreachable. */
+  | 'ttl'
+  /** A state-changing entry point with no or ineffective authorization. */
+  | 'auth'
+  /** Error discriminants disagree with what is deployed. */
+  | 'abi'
+  /** Administrative operations on an asset. */
+  | 'value'
+  /** Coverage gaps. */
+  | 'tests';
+
+export const SIGNAL_CATEGORIES: SignalCategory[] = [
+  'drift', 'ttl', 'auth', 'abi', 'value', 'tests',
+];
+
 export interface Signal {
   severity: 'info' | 'warn';
+  category: SignalCategory;
   message: string;
   nodeId?: string;
 }
@@ -245,6 +268,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     if (data?.drift === 'stale') {
       out.push({
         severity: 'warn',
+        category: 'drift',
         message: `${node.title} runs a different build than your local source.`,
         nodeId: node.id,
       });
@@ -256,6 +280,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     if (data && data.durability === 'persistent' && !data.hasTtlExtension) {
       out.push({
         severity: 'warn',
+        category: 'ttl',
         message: `Persistent key ${data.key} is never given an extend_ttl; it can expire and become unreachable.`,
         nodeId: node.id,
       });
@@ -283,6 +308,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     if (contract.tests.length === 0) {
       out.push({
         severity: 'info',
+        category: 'tests',
         message: `No tests reference ${contract.node.title}.`,
         nodeId: contract.node.id,
       });
@@ -304,6 +330,7 @@ export function signals(memory: ProjectMemory): Signal[] {
         if (guardsOf(fn.id).length > 0) continue;
         out.push({
           severity: 'warn',
+          category: 'auth',
           message: `${contract.node.title}.${fn.title} writes state but never calls require_auth.`,
           nodeId: fn.id,
         });
@@ -313,6 +340,7 @@ export function signals(memory: ProjectMemory): Signal[] {
       if (isUnguardedInitializer(memory, fn, data)) {
         out.push({
           severity: 'warn',
+          category: 'auth',
           message:
             `${contract.node.title}.${fn.title} authorizes only \`${data.authSubjects?.[0]?.expr}\`, ` +
             `a caller-supplied parameter, and writes instance storage it never read — ` +
@@ -347,6 +375,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     if (data?.deployedMismatch) {
       out.push({
         severity: 'warn',
+        category: 'abi',
         message: `${node.title} discriminants disagree with the deployed contract: ${data.deployedMismatch}.`,
         nodeId: node.id,
       });
@@ -365,6 +394,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     if (data.kind === 'stellar-asset' && admin.length > 0) {
       out.push({
         severity: 'warn',
+        category: 'value',
         message:
           `${node.title} is reached through a Stellar Asset Contract client and this project ` +
           `names ${admin.map((m) => `\`${m}\``).join(', ')} on it — administrative token operations.`,
@@ -381,6 +411,7 @@ export function signals(memory: ProjectMemory): Signal[] {
     const names = ungated.map((c) => c.node.title).join(', ');
     out.push({
       severity: 'warn',
+      category: 'tests',
       message:
         `Every test module calls mock_all_auths, which disables authorization in the test ` +
         `environment. The access control on ${names} is therefore never exercised by the suite.`,

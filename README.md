@@ -158,11 +158,11 @@ note is **marked stale, never deleted**.
 ## Install
 
 ```bash
-npm install -g stellar-memory
+npm install -g soroban-memory
 ```
 
 The binary is named `stellar-memory`, so the Stellar CLI picks it up as a plugin
-and `stellar memory <command>` works natively. `npx stellar-memory` works too.
+and `stellar memory <command>` works natively. `npx soroban-memory` works too.
 
 Requires Node 20+. The Stellar CLI is optional — without it you still get the
 full source-level memory, just not the on-chain half.
@@ -171,12 +171,34 @@ full source-level memory, just not the on-chain half.
 
 | Command | What it does |
 |---|---|
-| `init` | Create the vault for this project |
-| `scan` | Analyse the repo and update the memory. `--offline` skips all network and CLI calls |
+| `scan` | Analyse the repo and update the memory. Creates the vault if there isn't one. `--offline` skips all network and CLI calls |
 | `resume` | Recover context: what this is, what moved, what is pending |
 | `explain [question]` | Ask about the project. `--ai` for a written answer |
 | `graph` | Show how it fits together — `tree`, `mermaid`, `dot`, or `json` |
+| `check` | Exit non-zero when the project has blocking issues. For CI |
 | `mcp` | Serve the memory to agents over MCP (stdio) |
+| `init` | Create the vault explicitly. `--with-agents` also scaffolds the agent team |
+
+## In CI
+
+```bash
+stellar-memory scan --offline
+stellar-memory check --fail-on auth,ttl
+```
+
+`check` exits `1` when a checked category has findings, `0` when clean, and `2`
+when it is misconfigured — a typo in `--fail-on` must not make a pipeline green
+for the wrong reason. Categories: `drift`, `ttl`, `auth`, `abi`, `value`,
+`tests`, or `all`.
+
+The one worth wiring up first is **`drift`**. Testnet gets reset, people
+redeploy by hand, and nobody knows whether what is running is what is on `main`.
+That check answers it by comparing Wasm hashes, and there is nothing else that
+will tell you.
+
+A ready workflow — offline checks on every PR, drift checked separately so forks
+without secrets skip rather than fail — is in
+[`templates/workflows/stellar-memory.yml`](templates/workflows/stellar-memory.yml).
 
 ## The AI layer is optional
 

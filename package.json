@@ -1,5 +1,5 @@
 {
-  "name": "stellar-memory",
+  "name": "soroban-memory",
   "version": "0.1.0",
   "description": "Persistent memory layer for Stellar/Soroban projects. Scans your repo, links code to on-chain reality, and serves the result to you and to your AI agents over MCP.",
   "type": "module",
@@ -17,14 +17,24 @@
     "templates",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duraznito16/stellar-memory.git"
+  },
+  "homepage": "https://github.com/duraznito16/stellar-memory#readme",
+  "bugs": {
+    "url": "https://github.com/duraznito16/stellar-memory/issues"
+  },
   "keywords": [
     "stellar",
     "soroban",
     "stellar-cli-plugin",
     "mcp",
+    "mcp-server",
     "knowledge-graph",
     "developer-tools",
-    "smart-contracts"
+    "smart-contracts",
+    "ai-agents"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

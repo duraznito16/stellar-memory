@@ -13,6 +13,7 @@ import { runScan } from './commands/scan.js';
 import { runResume } from './commands/resume.js';
 import { runExplain } from './commands/explain.js';
 import { runGraph } from './commands/graph.js';
+import { runCheck } from './commands/check.js';
 import { runMcp } from './commands/mcp.js';
 
 const program = new Command();
@@ -64,6 +65,18 @@ program
   .option('-f, --format <format>', 'tree | mermaid | dot | json', 'tree')
   .option('--focus <id>', 'centre the graph on one node')
   .action(async (opts) => runGraph({ ...globals(), ...opts }));
+
+program
+  .command('check')
+  .description('fail with a non-zero exit code when the project has blocking issues (for CI)')
+  .option(
+    '--fail-on <categories>',
+    'comma-separated: drift, ttl, auth, abi, value, tests, or "all"',
+    'drift,auth',
+  )
+  .option('--all', 'also consider informational findings', false)
+  .option('--json', 'emit the result as JSON', false)
+  .action(async (opts) => runCheck({ ...globals(), ...opts }));
 
 program
   .command('mcp')
