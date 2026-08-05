@@ -37,14 +37,19 @@ async function check(...args: string[]): Promise<Run> {
 }
 
 test('exits non-zero when a checked category has findings', async () => {
-  // The demo has real drift and real auth problems, so the default gate fails.
+  // The demo's initializers are genuinely unguarded, so the default gate fails
+  // on `auth` regardless of whether the vault has seen the network.
   const run = await check();
   assert.equal(run.code, 1, 'a failing gate must exit 1');
   assert.match(run.stdout, /blocking issue/);
 });
 
 test('reports categories separately and machine-readably', async () => {
-  const run = await check('--fail-on', 'drift', '--json');
+  // Gate on `auth` rather than `drift`: auth findings are derived from source
+  // alone, so this holds whether the committed vault was last scanned online or
+  // offline. Drift only exists after a networked scan, and a unit test that
+  // depends on it passes or fails according to how someone last ran the tool.
+  const run = await check('--fail-on', 'auth', '--json');
   assert.equal(run.code, 1);
 
   const parsed = JSON.parse(run.stdout) as {
@@ -55,15 +60,15 @@ test('reports categories separately and machine-readably', async () => {
   };
 
   assert.equal(parsed.ok, false);
-  assert.deepEqual(parsed.failed_on, ['drift']);
+  assert.deepEqual(parsed.failed_on, ['auth']);
   assert.ok(parsed.failing.length > 0);
   assert.ok(
-    parsed.failing.every((s) => s.category === 'drift'),
+    parsed.failing.every((s) => s.category === 'auth'),
     'only the requested category may fail the gate',
   );
   assert.ok(
-    parsed.other.some((s) => s.category === 'auth'),
-    'findings outside the gate are still reported',
+    parsed.other.length > 0 && parsed.other.every((s) => s.category !== 'auth'),
+    'findings outside the gate are still reported, and are not the gated category',
   );
 });
 
