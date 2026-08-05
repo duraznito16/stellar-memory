@@ -1552,18 +1552,18 @@
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
         "branch": "master",
-        "head": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df",
-        "lastCommitDate": "2026-08-04T22:45:56-05:00",
-        "dirtyFiles": 6
+        "head": "9ea01f5b2d75d80477196f4657b94bab481cce91",
+        "lastCommitDate": "2026-08-04T23:16:24-05:00",
+        "dirtyFiles": 5
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df"
+          "ref": "9ea01f5b2d75d80477196f4657b94bab481cce91"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T04:15:44.462Z"
+      "lastChanged": "2026-08-05T13:30:11.835Z"
     }
   ],
   "edges": [
@@ -2610,6 +2610,15 @@
         "removed:type:DataKey",
         "removed:error:PayrollError",
         "removed:error:TreasuryError"
+      ]
+    },
+    {
+      "at": "2026-08-05T13:30:11.835Z",
+      "commit": "9ea01f5b2d75d80477196f4657b94bab481cce91",
+      "nodeCount": 55,
+      "edgeCount": 73,
+      "changed": [
+        "project:private-payroll"
       ]
     }
   ]

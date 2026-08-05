@@ -127,8 +127,12 @@ export interface ContractData {
   upgradeFn?: string;
 }
 
-/** Where the address passed to `require_auth` came from. */
-export type AuthOrigin = 'param' | 'storage' | 'current_contract' | 'unknown';
+/**
+ * Where the address passed to `require_auth` came from. `guard-macro` covers
+ * library attributes such as OpenZeppelin's `#[only_owner]`, which gate a
+ * function without any call in its body.
+ */
+export type AuthOrigin = 'param' | 'storage' | 'current_contract' | 'guard-macro' | 'unknown';
 
 export interface AuthSubjectData {
   expr: string;

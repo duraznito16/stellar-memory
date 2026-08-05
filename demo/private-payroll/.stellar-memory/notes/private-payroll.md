@@ -4,7 +4,7 @@ kind: project
 title: private-payroll
 summary: Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.
 first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-05T04:15:44.462Z
+last_changed: 2026-08-05T13:30:11.835Z
 tags:
   - stellar-memory
   - kind/project
@@ -44,7 +44,7 @@ Confidential payroll payments on Stellar. A company funds a Treasury once, and t
 
 <details><summary>Where this came from</summary>
 
-- From git `b9aa82c53f61f17a0472cfcd8f00e42cc0b789df`
+- From git `9ea01f5b2d75d80477196f4657b94bab481cce91`
 
 </details>
 <!-- /stellar-memory:auto -->

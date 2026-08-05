@@ -48,8 +48,24 @@ export interface StorageAccess {
   line: number;
 }
 
-/** Where the address passed to `require_auth` came from. */
-export type AuthOrigin = 'param' | 'storage' | 'current_contract' | 'unknown';
+/**
+ * Where the address passed to `require_auth` came from.
+ *
+ * `guard-macro` covers libraries that move the check out of the body entirely —
+ * OpenZeppelin's `#[only_owner]` and `#[only_role(..)]` gate a function through
+ * a proc macro, so the body contains no `require_auth` call at all. Reading that
+ * as "no authorization" would report audited library code as an open door.
+ */
+export type AuthOrigin = 'param' | 'storage' | 'current_contract' | 'guard-macro' | 'unknown';
+
+/**
+ * Attributes that gate a function on the caller's identity or role.
+ *
+ * Deliberately excludes `#[when_not_paused]` and similar state guards: those
+ * restrict *when* a function may run, not *who* may run it.
+ */
+const ACCESS_GUARD_ATTRS =
+  /^(only_owner|only_admin|only_role|only_any_role|has_role|only_authorized)\b/;
 
 export interface AuthSubject {
   /** The receiver expression as written, e.g. `admin`. */
@@ -83,6 +99,8 @@ export interface FunctionDecl {
   contractCalls: ContractCall[];
   /** True when this function calls `update_current_contract_wasm`. */
   upgradesContract: boolean;
+  /** Access-control attributes on this function, e.g. `only_owner`. */
+  guards: string[];
 }
 
 export interface ContractDecl {
@@ -268,6 +286,17 @@ export function analyseRustFile(
     }
   }
 
+  // OpenZeppelin's upgradeable module generates the upgrade entry point from a
+  // derive macro, so `update_current_contract_wasm` never appears in the user's
+  // source. Reporting such a contract as "not upgradeable" would be a false
+  // statement about it — the most damaging kind of error this tool can make.
+  for (const derived of collectUpgradeableDerives(src)) {
+    const decl = byName.get(derived.name);
+    if (!decl) continue;
+    decl.upgradeable = true;
+    decl.upgradeFn ??= derived.migratable ? 'upgrade (derived, with migrate)' : 'upgrade (derived)';
+  }
+
   analysis.contracts = [...byName.values()].filter(
     (c) => c.functions.length > 0 || contractNames.some((n) => n.name === c.name),
   );
@@ -442,6 +471,38 @@ function collectErrorEnums(src: string): ErrorDecl[] {
   return out;
 }
 
+/**
+ * Contract structs carrying `#[derive(Upgradeable)]` or
+ * `#[derive(UpgradeableMigratable)]` from OpenZeppelin's `stellar-macros`.
+ */
+function collectUpgradeableDerives(src: string): { name: string; migratable: boolean }[] {
+  const out: { name: string; migratable: boolean }[] = [];
+  const re = /#\[derive\(([^)]*)\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?struct\s+(\w+)/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    const derives = m[1] ?? '';
+    const name = m[2];
+    if (!name) continue;
+    const migratable = /\bUpgradeableMigratable\b/.test(derives);
+    if (migratable || /\bUpgradeable\b/.test(derives)) out.push({ name, migratable });
+  }
+
+  // `#[derive(..)]` may sit above `#[contract]`, in which case the struct is not
+  // adjacent to the derive. Fall back to the trait implementation, which is
+  // required by both macros.
+  const implRe = /impl\s+Upgradeable(?:Migratable)?Internal\s+for\s+(\w+)/g;
+  let i: RegExpExecArray | null;
+  while ((i = implRe.exec(src)) !== null) {
+    const name = i[1];
+    if (name && !out.some((o) => o.name === name)) {
+      out.push({ name, migratable: /Migratable/.test(i[0]) });
+    }
+  }
+
+  return out;
+}
+
 function collectAttributed(src: string, attr: string): NamedDecl[] {
   const out: NamedDecl[] = [];
   const re = new RegExp(
@@ -604,6 +665,7 @@ function parseImplFunctions(
   while ((m = re.exec(body)) !== null) {
     const name = m[1];
     if (!name) continue;
+    const guards = guardAttributesBefore(body, m.index);
     const parenOpen = from + m.index + m[0].length - 1;
     const parenClose = matchParen(src, parenOpen);
     const paramText = src.slice(parenOpen + 1, parenClose - 1);
@@ -632,8 +694,16 @@ function parseImplFunctions(
       line: lineAt(src, from + m.index),
       params,
       returns: returns || undefined,
-      requiresAuth: /\brequire_auth(_for_args)?\s*\(/.test(fnBody),
-      authSubjects: parseAuthSubjects(fnBody, params, helpers),
+      requiresAuth: /\brequire_auth(_for_args)?\s*\(/.test(fnBody) || guards.length > 0,
+      authSubjects: [
+        ...guards.map((guard) => ({
+          expr: `#[${guard}]`,
+          origin: 'guard-macro' as const,
+          forArgs: false,
+        })),
+        ...parseAuthSubjects(fnBody, params, helpers),
+      ],
+      guards,
       storage: [
         ...parseStorage(fnBody, lineAt(src, braceOpen)),
         ...called.flatMap(([, helper]) => helper.storage),
@@ -980,6 +1050,47 @@ function parseContractCalls(
   }
 
   return out;
+}
+
+/**
+ * Access-control attributes attached to the function starting at `index`.
+ *
+ * Walks backwards over the contiguous run of `#[...]` attributes immediately
+ * preceding it, so `#[only_owner]` two attributes above the `pub fn` still
+ * counts, while an attribute on an unrelated earlier item does not.
+ */
+function guardAttributesBefore(body: string, index: number): string[] {
+  const found: string[] = [];
+  let cursor = index;
+
+  for (;;) {
+    // Skip whitespace back to the previous non-space character.
+    let i = cursor - 1;
+    while (i >= 0 && /\s/.test(body[i] ?? '')) i--;
+    if (i < 0 || body[i] !== ']') break;
+
+    // Walk back to the matching `#[`.
+    let depth = 0;
+    let j = i;
+    for (; j >= 0; j--) {
+      const c = body[j];
+      if (c === ']') depth++;
+      else if (c === '[') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (j <= 0 || body[j - 1] !== '#') break;
+
+    const inner = body.slice(j + 1, i).trim();
+    if (ACCESS_GUARD_ATTRS.test(inner)) {
+      const name = /^(\w+)/.exec(inner)?.[1];
+      if (name && !found.includes(name)) found.unshift(name);
+    }
+    cursor = j - 1;
+  }
+
+  return found;
 }
 
 /** `let client = X::new(…)` — the name the constructed client was bound to. */

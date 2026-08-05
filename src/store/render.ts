@@ -194,6 +194,12 @@ function renderFunction(node: MemoryNode): string {
         case 'current_contract':
           lines.push(`- ${call} on this contract's own address.`);
           break;
+        case 'guard-macro':
+          lines.push(
+            `- Gated by \`${subject.expr}\`, a library attribute that performs the ` +
+              `authorization check outside the function body.`,
+          );
+          break;
         default:
           lines.push(`- ${call} on \`${subject.expr}\` — origin not resolved.`);
       }

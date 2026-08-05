@@ -404,6 +404,8 @@ function describeAuth(data: FunctionData | undefined): string {
         return `auth: ${s.expr} (caller-supplied parameter — restricts nobody)`;
       case 'current_contract':
         return 'auth: this contract';
+      case 'guard-macro':
+        return `auth: gated by ${s.expr}`;
       default:
         return `auth: ${s.expr} (origin unresolved)`;
     }
