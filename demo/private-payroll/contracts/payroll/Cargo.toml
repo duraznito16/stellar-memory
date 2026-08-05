@@ -1,0 +1,17 @@
+[package]
+name = "payroll"
+description = "Orchestrates confidential salary payments from the treasury to employees."
+version = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+treasury = { path = "../treasury" }
+employee-registry = { path = "../employee-registry" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

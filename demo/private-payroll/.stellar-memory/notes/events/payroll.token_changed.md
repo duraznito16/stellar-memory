@@ -1,0 +1,37 @@
+---
+id: event:Payroll.token_changed
+kind: event
+title: token_changed
+path: contracts/payroll/src/lib.rs
+summary: Published via `env.events().publish(...)`.
+first_seen: 2026-08-04T23:23:28.099Z
+last_changed: 2026-08-04T23:23:28.099Z
+tags:
+  - stellar-memory
+  - kind/event
+---
+
+<!-- stellar-memory:auto -->
+# token_changed
+
+Published via `env.events().publish(...)`.
+
+**Source:** `contracts/payroll/src/lib.rs:104`
+
+## Connections
+
+**Emitted by**
+- [[functions/payroll.set_pay_token|set_pay_token]]
+
+---
+
+<details><summary>Where this came from</summary>
+
+- Parsed from `contracts/payroll/src/lib.rs:104`
+
+</details>
+<!-- /stellar-memory:auto -->
+
+## Notes
+
+<!-- Anything you write below is yours. stellar-memory will never overwrite it. -->

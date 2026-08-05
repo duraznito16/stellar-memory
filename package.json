@@ -1,0 +1,52 @@
+{
+  "name": "stellar-memory",
+  "version": "0.1.0",
+  "description": "Persistent memory layer for Stellar/Soroban projects. Scans your repo, links code to on-chain reality, and serves the result to you and to your AI agents over MCP.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "stellar-memory": "dist/index.js"
+  },
+  "main": "dist/lib.js",
+  "types": "dist/lib.d.ts",
+  "files": [
+    "dist",
+    "templates",
+    "README.md"
+  ],
+  "keywords": [
+    "stellar",
+    "soroban",
+    "stellar-cli-plugin",
+    "mcp",
+    "knowledge-graph",
+    "developer-tools",
+    "smart-contracts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "prepublishOnly": "npm run build",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "memory": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "commander": "^14.0.0",
+    "picocolors": "^1.1.1",
+    "smol-toml": "^1.7.1",
+    "yaml": "^2.9.0",
+    "zod": "^3.25.0"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.71.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

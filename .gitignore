@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Rust build output (the demo workspace compiles to wasm here)
+target/
+.env
+.env.local
+
+# Demo fixtures cloned at runtime
+demo/vendor/
+
+# The memory vault of THIS repo (a scanned project commits its own .stellar-memory/)
+.stellar-memory/cache/
