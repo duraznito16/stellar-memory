@@ -122,6 +122,23 @@ export interface RustFileAnalysis {
   usesSorobanSdk: boolean;
 }
 
+/**
+ * A free function defined outside any `#[contractimpl]` block.
+ *
+ * Real Soroban projects keep storage access and role lookups in helper modules —
+ * `balance.rs`, `allowance.rs`, `read_admin()` — which is how the official
+ * examples are written. Walking only impl bodies made the entire fund-bearing
+ * storage surface of such a contract invisible, and turned every helper-resolved
+ * admin into an unknown auth subject.
+ */
+interface HelperFn {
+  storage: StorageAccess[];
+  events: string[];
+  clientCalls: string[];
+  /** Set when the helper's whole job is to read one storage key and return it. */
+  returnsStorageKey?: string;
+}
+
 export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
   const src = stripComments(source);
 
@@ -143,6 +160,10 @@ export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
 
   const contractNames = collectContractNames(src);
   const impls = collectContractImpls(src);
+  const helpers = collectFreeFunctions(
+    src,
+    impls.map((i) => [i.bodyStart, i.bodyEnd] as [number, number]),
+  );
 
   // A `#[contractimpl]` block is where the public interface lives. Group the
   // impl blocks by the type they implement so partial impls merge into one
@@ -160,7 +181,13 @@ export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
       byName.set(impl.typeName, decl);
     }
     decl.functions.push(
-      ...parseImplFunctions(src, impl.bodyStart, impl.bodyEnd, impl.traitPath !== undefined),
+      ...parseImplFunctions(
+        src,
+        impl.bodyStart,
+        impl.bodyEnd,
+        impl.traitPath !== undefined,
+        helpers,
+      ),
     );
     if (impl.traitPath) {
       decl.implementsTraits = [...(decl.implementsTraits ?? []), impl.traitPath];
@@ -406,11 +433,61 @@ function enclosingModule(src: string, index: number): string | undefined {
  * Function parsing
  * ------------------------------------------------------------------ */
 
+/**
+ * Free functions in this file, indexed by name, with the storage they touch.
+ * Skipped: anything inside a `#[contractimpl]` block (already parsed as an
+ * entry point) and declarations with no body.
+ */
+function collectFreeFunctions(
+  src: string,
+  implRanges: [number, number][],
+): Map<string, HelperFn> {
+  const out = new Map<string, HelperFn>();
+  const re = /\bfn\s+(\w+)\s*(?:<[^>]*>)?\s*\(/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    const name = m[1];
+    if (!name) continue;
+    if (implRanges.some(([start, end]) => m!.index >= start && m!.index < end)) continue;
+
+    const parenOpen = m.index + m[0].length - 1;
+    const parenClose = matchParen(src, parenOpen);
+    const braceOpen = src.indexOf('{', parenClose);
+    if (braceOpen === -1) continue;
+    // `fn foo();` in a trait declaration has no body to read.
+    if (src.slice(parenClose, braceOpen).includes(';')) continue;
+
+    const body = src.slice(braceOpen, matchBrace(src, braceOpen));
+    const storage = parseStorage(body, lineAt(src, braceOpen));
+
+    out.set(name, {
+      storage,
+      events: parseEvents(body),
+      clientCalls: parseClientCalls(body),
+      returnsStorageKey: soleStorageRead(storage),
+    });
+  }
+  return out;
+}
+
+/**
+ * When a helper does exactly one storage read and no writes, its return value is
+ * that stored value — which is how `read_admin(&env)` yields the admin address.
+ */
+function soleStorageRead(storage: StorageAccess[]): string | undefined {
+  const reads = storage.filter((s) => s.op === 'get' || s.op === 'try_get');
+  const writes = storage.filter((s) => s.op === 'set' || s.op === 'update' || s.op === 'remove');
+  if (reads.length !== 1 || writes.length > 0) return undefined;
+  return reads[0]?.key;
+}
+
 function parseImplFunctions(
   src: string,
   from: number,
   to: number,
   isTraitImpl = false,
+  helpers: Map<string, HelperFn> = new Map(),
 ): FunctionDecl[] {
   const body = src.slice(from, to);
   const out: FunctionDecl[] = [];
@@ -440,16 +517,32 @@ function parseImplFunctions(
     const fnBody = src.slice(braceOpen, bodyEnd);
 
     const params = parseParams(paramText);
+
+    // Fold in whatever the helpers this body calls do. Without this, a contract
+    // that keeps its storage access in `balance.rs` — the canonical layout —
+    // appears to touch no storage at all.
+    const called = [...helpers.entries()].filter(([helperName]) =>
+      new RegExp(`\\b${helperName}\\s*\\(`).test(fnBody),
+    );
+
     out.push({
       name,
       line: lineAt(src, from + m.index),
       params,
       returns: returns || undefined,
       requiresAuth: /\brequire_auth(_for_args)?\s*\(/.test(fnBody),
-      authSubjects: parseAuthSubjects(fnBody, params),
-      storage: parseStorage(fnBody, lineAt(src, braceOpen)),
-      events: parseEvents(fnBody),
-      clientCalls: parseClientCalls(fnBody),
+      authSubjects: parseAuthSubjects(fnBody, params, helpers),
+      storage: [
+        ...parseStorage(fnBody, lineAt(src, braceOpen)),
+        ...called.flatMap(([, helper]) => helper.storage),
+      ],
+      events: [...parseEvents(fnBody), ...called.flatMap(([, helper]) => helper.events)],
+      clientCalls: [
+        ...new Set([
+          ...parseClientCalls(fnBody),
+          ...called.flatMap(([, helper]) => helper.clientCalls),
+        ]),
+      ],
       upgradesContract: /\bupdate_current_contract_wasm\s*\(/.test(fnBody),
     });
   }
@@ -603,6 +696,7 @@ function canonicaliseKey(expr: string, bindings: Map<string, string>): string {
 function parseAuthSubjects(
   fnBody: string,
   params: { name: string; type: string }[],
+  helpers: Map<string, HelperFn> = new Map(),
 ): AuthSubject[] {
   const bindings = collectLetBindings(fnBody);
   const paramNames = new Set(params.map((p) => p.name));
@@ -629,9 +723,18 @@ function parseAuthSubjects(
             bound,
           )
         : null;
+
       if (loaded?.[1]) {
         origin = 'storage';
         key = loaded[1].replace(/\.clone\s*\(\s*\)/g, '').replace(/\s+/g, ' ').trim();
+      } else if (bound) {
+        // `let admin = read_admin(&env);` — follow the helper to the key it reads.
+        const call = /^\s*(\w+)\s*\(/.exec(bound);
+        const helper = call?.[1] ? helpers.get(call[1]) : undefined;
+        if (helper?.returnsStorageKey) {
+          origin = 'storage';
+          key = helper.returnsStorageKey;
+        }
       }
     }
 

@@ -262,13 +262,19 @@ export function signals(memory: ProjectMemory): Signal[] {
 
   // Whether a function changes state is read from what it actually does, not
   // from what it is called. Guessing by name prefix flagged `payroll_address` —
-  // a plain getter — because it begins with "pay". A read-only function
-  // reported as an unauthenticated mutation is exactly the kind of wrong that
-  // makes a developer stop trusting the tool.
+  // a plain getter — because it begins with "pay".
+  //
+  // Only writes count. Publishing an event is not a state change: a read-only
+  // view that emits a log for indexers needs no authorization, and flagging it
+  // was a false positive on entirely correct code.
   const mutatingFunctions = new Set<string>();
   for (const edge of memory.edges) {
-    if (edge.kind === 'writes' || edge.kind === 'emits') mutatingFunctions.add(edge.from);
+    if (edge.kind === 'writes') mutatingFunctions.add(edge.from);
   }
+
+  /** Instance keys this function checks with `has` — the re-init guard. */
+  const guardsOf = (fnId: string) =>
+    memory.edges.filter((e) => e.from === fnId && e.kind === 'reads' && e.note === '`has`');
 
   const arch = architecture(memory);
   for (const contract of arch.contracts) {
@@ -283,11 +289,20 @@ export function signals(memory: ProjectMemory): Signal[] {
       const data = fn.data as unknown as FunctionData | undefined;
       if (!data) continue;
 
+      // `__constructor` runs once, at deploy, and cannot be called again.
+      // There is no prior state to authorize against and no replay to guard, so
+      // neither auth signal applies to it.
+      if (fn.title === '__constructor') continue;
+
       if (!data.requiresAuth) {
         if (!mutatingFunctions.has(fn.id)) continue;
+        // A one-shot initializer guarded by `has()` + panic is the canonical
+        // Soroban pattern: at deploy time there is no admin to authorize, and
+        // the guard is what makes replay impossible.
+        if (guardsOf(fn.id).length > 0) continue;
         out.push({
           severity: 'warn',
-          message: `${contract.node.title}.${fn.title} writes state or emits an event but never calls require_auth.`,
+          message: `${contract.node.title}.${fn.title} writes state but never calls require_auth.`,
           nodeId: fn.id,
         });
         continue;
@@ -384,12 +399,15 @@ function isUnguardedInitializer(
   const writes = outgoing.filter((e) => e.kind === 'writes' && durabilityOf(e.to) === 'instance');
   if (writes.length === 0) return false;
 
-  const reads = outgoing.filter((e) => e.kind === 'reads' && durabilityOf(e.to) === 'instance');
-  // A `has` check is the idiomatic re-initialization guard.
-  if (reads.some((e) => e.note === '`has`')) return false;
-
-  const readKeys = new Set(reads.map((e) => e.to));
-  return writes.some((w) => !readKeys.has(w.to));
+  // Any read of instance storage means the function consulted existing state
+  // before acting, and that read is the gate. This covers the `has()` re-init
+  // guard and also the two-step ownership transfer, where `accept_admin`
+  // authorizes a caller-supplied address and then checks it against the stored
+  // pending admin — correct code that an earlier per-key comparison flagged.
+  const readsInstance = outgoing.some(
+    (e) => e.kind === 'reads' && durabilityOf(e.to) === 'instance',
+  );
+  return !readsInstance;
 }
 
 /* ------------------------------------------------------------------ *

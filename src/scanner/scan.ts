@@ -592,9 +592,18 @@ async function indexTests(
 
     // `mock_all_auths` disables every authorization check in the test env. It is
     // the right tool for testing business logic and the wrong one for proving a
-    // contract is access-controlled — a suite that mocks throughout has not
-    // exercised its auth surface at all.
-    const mocksAllAuths = source ? /\bmock_all_auths(_allowing_non_root_auth)?\s*\(/.test(source) : false;
+    // contract is access-controlled.
+    //
+    // But a real suite mixes both in one file: a blanket-mocked happy path plus
+    // targeted `mock_auths` / `set_auths(&[])` rejection tests. Treating any
+    // occurrence as tainting the whole module told developers to write tests
+    // they had already written, so a module that also exercises auth directly
+    // does not count as blanket-mocked.
+    const blanketMocks = source ? /\bmock_all_auths(_allowing_non_root_auth)?\s*\(/.test(source) : false;
+    const exercisesAuth = source
+      ? /\b(mock_auths|set_auths|try_[a-z_]+\s*\([^)]*\)[\s\S]{0,200}?(Unauthorized|InvalidAction))/.test(source)
+      : false;
+    const mocksAllAuths = blanketMocks && !exercisesAuth;
     const testCount = source ? (source.match(/#\[test\]/g) ?? []).length : 0;
     const testData: TestData = { mocksAllAuths, testCount };
 

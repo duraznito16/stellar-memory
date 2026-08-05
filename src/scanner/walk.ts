@@ -91,7 +91,11 @@ export async function walkRepo(root: string): Promise<WalkResult> {
 export async function readFileSafe(entry: FileEntry): Promise<string | null> {
   if (entry.size > MAX_READ_BYTES) return null;
   try {
-    return await fs.readFile(entry.abs, 'utf8');
+    const text = await fs.readFile(entry.abs, 'utf8');
+    // Windows editors and PowerShell write UTF-8 with a byte-order mark. A
+    // leading BOM makes a TOML parser reject an otherwise valid Cargo.toml, so
+    // a manifest authored on Windows would silently drop out of the scan.
+    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   } catch {
     return null;
   }

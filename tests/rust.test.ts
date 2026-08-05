@@ -345,6 +345,48 @@ impl A {
   assert.equal(contract.upgradeFn, 'bump');
 });
 
+test('follows storage and role lookups into free helper functions', () => {
+  // The official Soroban examples keep storage access in helper modules
+  // (balance.rs, allowance.rs, read_admin). Walking only `#[contractimpl]`
+  // bodies made the entire fund-bearing storage surface invisible, and turned
+  // every helper-resolved admin into an unknown auth subject.
+  const src = `
+use soroban_sdk::{contract, contractimpl, Address, Env};
+
+fn read_admin(env: &Env) -> Address {
+    env.storage().instance().get(&DataKey::Admin).unwrap()
+}
+fn write_balance(env: &Env, addr: &Address, amount: i128) {
+    env.storage().persistent().set(&DataKey::Balance(addr.clone()), &amount);
+    env.storage().persistent().extend_ttl(&DataKey::Balance(addr.clone()), 100, 200);
+}
+
+#[contract]
+pub struct Token;
+#[contractimpl]
+impl Token {
+    pub fn mint(env: Env, to: Address, amount: i128) {
+        let admin = read_admin(&env);
+        admin.require_auth();
+        write_balance(&env, &to, amount);
+    }
+}
+`;
+  const contract = analyseRustFile('t.rs', src).contracts[0]!;
+  assert.deepEqual(contract.functions.map((f) => f.name), ['mint'], 'helpers are not entry points');
+
+  const mint = contract.functions[0]!;
+  assert.equal(mint.authSubjects[0]?.origin, 'storage', 'admin resolved through the helper');
+  assert.equal(mint.authSubjects[0]?.key, 'DataKey::Admin');
+
+  // The balance write and its TTL extension both live in the helper.
+  assert.ok(mint.storage.some((s) => s.op === 'set' && s.key === 'DataKey::Balance(addr)'));
+  assert.ok(
+    mint.storage.some((s) => s.op === 'extend_ttl' && s.key === 'DataKey::Balance(addr)'),
+    'a TTL extended inside a helper still counts',
+  );
+});
+
 test('a plain Rust file yields no contracts', () => {
   const a = analyseRustFile('src/util.rs', 'pub fn add(a: u32, b: u32) -> u32 { a + b }');
   assert.equal(a.contracts.length, 0);
