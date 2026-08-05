@@ -27,9 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The tests are written in TypeScript and run through Node's native type
+      # stripping, which arrived in 22.6. This is a development requirement only:
+      # what ships is compiled JavaScript, and the `dogfood` job below proves it
+      # runs on the minimum version the package actually declares.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -38,7 +42,7 @@ jobs:
       - run: npm test
 
   dogfood:
-    name: Run against a real Soroban project
+    name: Run against a real Soroban project (Node 20)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +50,9 @@ jobs:
           # `resume` reports what moved since the last scan, which needs history.
           fetch-depth: 0
 
+      # Deliberately the oldest version in `engines`. This job exercises the
+      # shipped artifact end to end, so a package that claims to support Node 20
+      # has to prove it here rather than in a README.
       - uses: actions/setup-node@v4
         with:
           node-version: 20

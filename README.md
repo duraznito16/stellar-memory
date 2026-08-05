@@ -235,9 +235,14 @@ node dist/index.js --cwd demo/private-payroll resume
 
 ```bash
 npm run build       # compile
-npm test            # parser + end-to-end MCP tests
+npm test            # parser, MCP handshake, and CI-gate tests
 npm run typecheck
 ```
+
+Running the package needs **Node 20+**. Running the *tests* needs **Node 22.6+**,
+because they are TypeScript executed through Node's native type stripping. CI
+runs the suite on Node 24 and exercises the built CLI on Node 20, so the minimum
+supported version is proven rather than asserted.
 
 ## License
 
