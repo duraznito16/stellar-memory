@@ -1,0 +1,236 @@
+# CI for stellar-memory itself.
+#
+# Two things are proven here. First, that the tool builds and its tests pass.
+# Second — and this is the part worth watching — that the tool still tells the
+# truth about a real Soroban project, by running it against the demo workspace
+# and asserting the exact behaviour we expect.
+#
+# The demo contains deliberate defects, so `check` exits 1 on it. That is the
+# correct outcome, and CI asserts it rather than treating it as a failure. A
+# gate that cannot fail is not a gate.
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  dogfood:
+    name: Run against a real Soroban project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `resume` reports what moved since the last scan, which needs history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # Fully deterministic: no network, no toolchain, no credentials.
+      - name: Scan the demo offline
+        run: node dist/index.js --cwd demo/private-payroll scan --offline
+
+      - name: The scan must find the whole workspace
+        run: |
+          node -e '
+            const fs = require("fs");
+            const idx = JSON.parse(fs.readFileSync("demo/private-payroll/.stellar-memory/index.json", "utf8"));
+            const contracts = idx.nodes.filter(n => n.kind === "contract").map(n => n.title).sort();
+            const expected = ["EmployeeRegistry", "Payroll", "Treasury"];
+            if (JSON.stringify(contracts) !== JSON.stringify(expected)) {
+              console.error("expected", expected, "got", contracts);
+              process.exit(1);
+            }
+            const calls = idx.edges.filter(e => e.kind === "calls" && e.from === "contract:Payroll").map(e => e.to).sort();
+            if (!calls.includes("contract:Treasury") || !calls.includes("contract:EmployeeRegistry")) {
+              console.error("lost a cross-contract edge:", calls);
+              process.exit(1);
+            }
+            console.log("3 contracts, cross-contract edges intact");
+          '
+
+      # The gate has three distinct outcomes and all three must work. A gate that
+      # only ever passes is decoration; one that only ever fails gets disabled.
+      - name: The gate fires on a category the demo genuinely fails
+        run: |
+          set +e
+          node dist/index.js --cwd demo/private-payroll check --fail-on auth --json > auth.json
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then echo "expected exit 1, got $code"; cat auth.json; exit 1; fi
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("auth.json", "utf8"));
+            if (r.ok) { console.error("reported ok while exiting 1"); process.exit(1); }
+            if (!r.failing.every(s => s.category === "auth")) {
+              console.error("a category outside the gate failed the build:", r.failing);
+              process.exit(1);
+            }
+            console.log(`gate fired on ${r.failing.length} auth findings`);
+          '
+
+      - name: The gate stays quiet on a category the demo is clean on
+        run: |
+          node dist/index.js --cwd demo/private-payroll check --fail-on abi --json > abi.json
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("abi.json", "utf8"));
+            if (!r.ok || r.failing.length) { console.error("false alarm:", r.failing); process.exit(1); }
+            if (!r.other.length) { console.error("findings outside the gate should still be reported"); process.exit(1); }
+            console.log("clean gate passes, other findings still reported");
+          '
+
+      - name: A misconfigured gate is distinct from a failing one
+        run: |
+          set +e
+          node dist/index.js --cwd demo/private-payroll check --fail-on nonsense > /dev/null 2>&1
+          code=$?
+          set -e
+          # Exiting 0 on a typo would turn a pipeline green for the wrong reason.
+          if [ "$code" -ne 2 ]; then echo "expected exit 2 for an unknown category, got $code"; exit 1; fi
+          echo "unknown category exits 2, not 0"
+
+      - name: Publish the memory to the run summary
+        if: always()
+        run: |
+          {
+            echo '## What the memory says about the demo'
+            echo
+            echo '```'
+            node dist/index.js --cwd demo/private-payroll resume 2>&1 || true
+            echo '```'
+            echo
+            echo '### Architecture'
+            echo
+            echo '```mermaid'
+            node dist/index.js --cwd demo/private-payroll graph --format mermaid || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  contracts:
+    name: Contracts compile, and the analyser agrees with the compiler
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install the wasm target
+        run: rustup target add wasm32v1-none
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: demo/private-payroll
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build the demo contracts
+        working-directory: demo/private-payroll
+        run: cargo build --target wasm32v1-none --release
+
+      - name: Install the Stellar CLI
+        run: |
+          curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # The strongest check in this repository: the public functions the parser
+      # reports must match the spec embedded in the compiled Wasm. Static
+      # analysis is validated against the compiler rather than against opinion.
+      - name: Parser output must match the compiled Wasm spec
+        run: |
+          node dist/index.js --cwd demo/private-payroll scan --offline --quiet
+          for pair in "Payroll payroll" "Treasury treasury" "EmployeeRegistry employee_registry"; do
+            set -- $pair
+            contract=$1
+            artifact=$2
+            stellar contract info interface \
+              --wasm "demo/private-payroll/target/wasm32v1-none/release/${artifact}.wasm" \
+              --output json > "spec-${artifact}.json"
+            node -e '
+              const fs = require("fs");
+              const [contract, artifact] = process.argv.slice(1);
+              const idx = JSON.parse(fs.readFileSync("demo/private-payroll/.stellar-memory/index.json", "utf8"));
+              const parsed = idx.nodes
+                .filter(n => n.kind === "function" && n.id.startsWith(`function:${contract}.`))
+                .map(n => n.title).sort();
+              const spec = JSON.parse(fs.readFileSync(`spec-${artifact}.json`, "utf8"))
+                .filter(e => e.function_v0).map(e => e.function_v0.name).sort();
+              if (JSON.stringify(parsed) !== JSON.stringify(spec)) {
+                console.error(`${contract}: parser says ${parsed}, compiled Wasm says ${spec}`);
+                process.exit(1);
+              }
+              console.log(`${contract}: ${parsed.length} functions, parser agrees with the compiler`);
+            ' "$contract" "$artifact"
+          done
+
+  onchain:
+    name: On-chain drift
+    runs-on: ubuntu-latest
+    # Testnet is reset periodically and the contracts in this demo will vanish
+    # with it. That is a fact about the network, not a defect in this repository,
+    # so this job reports rather than blocks.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install the Stellar CLI
+        run: |
+          curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Contract aliases are committed under demo/private-payroll/.stellar/, so
+      # this resolves real deployments with no credentials at all. Every call the
+      # tool makes here is read-only: it never signs, deploys, or spends.
+      - name: Scan against testnet
+        run: node dist/index.js --cwd demo/private-payroll scan --network testnet
+
+      - name: Report what is live and whether it matches this branch
+        if: always()
+        run: |
+          {
+            echo '## On-chain'
+            echo
+            echo 'Treasury is deliberately out of sync: a getter was added locally and never redeployed.'
+            echo
+            echo '```'
+            node dist/index.js --cwd demo/private-payroll check --fail-on drift,abi 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

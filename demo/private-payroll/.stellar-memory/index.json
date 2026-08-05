@@ -4,7 +4,8 @@
     "name": "private-payroll",
     "purpose": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
     "networks": [
-      "testnet"
+      "testnet",
+      "mainnet"
     ]
   },
   "nodes": [
@@ -93,23 +94,17 @@
           "set_salary",
           "remove",
           "salary_of"
-        ],
-        "wasmPath": "target/wasm32v1-none/release/employee_registry.wasm",
-        "localWasmHash": "92065fb36f832750f5b6b1144e1731ef6fab5e47e80009c7bb6742fc3c3c497b"
+        ]
       },
       "provenance": [
         {
           "source": "source",
           "file": "contracts/employee-registry/src/lib.rs",
           "line": 12
-        },
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/employee_registry.wasm"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:42:18.062Z"
+      "lastChanged": "2026-08-05T15:42:25.313Z"
     },
     {
       "id": "function:EmployeeRegistry.initialize",
@@ -374,23 +369,17 @@
           "pay",
           "set_pay_token",
           "last_paid"
-        ],
-        "wasmPath": "target/wasm32v1-none/release/payroll.wasm",
-        "localWasmHash": "827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c"
+        ]
       },
       "provenance": [
         {
           "source": "source",
           "file": "contracts/payroll/src/lib.rs",
           "line": 38
-        },
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/payroll.wasm"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:42:18.062Z"
+      "lastChanged": "2026-08-05T15:42:25.313Z"
     },
     {
       "id": "function:Payroll.initialize",
@@ -802,23 +791,17 @@
           "withdraw",
           "balance",
           "payroll_address"
-        ],
-        "wasmPath": "target/wasm32v1-none/release/treasury.wasm",
-        "localWasmHash": "eaf0965402d93d78878a9ae409f0c1996d0f967492983926cc59d60aa347873b"
+        ]
       },
       "provenance": [
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
           "line": 24
-        },
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/treasury.wasm"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T04:15:44.462Z"
+      "lastChanged": "2026-08-05T15:42:25.313Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -1386,184 +1369,24 @@
       "lastChanged": "2026-08-04T23:23:28.099Z"
     },
     {
-      "id": "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-      "kind": "deployment",
-      "title": "employee-registry @ testnet",
-      "summary": "Live at `CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-        "onChainWasmHash": "92065fb36f832750f5b6b1144e1731ef6fab5e47e80009c7bb6742fc3c3c497b",
-        "alias": "employee-registry",
-        "drift": "in-sync",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "remove(employee: address)",
-              "doc": "Remove an employee from the registry."
-            },
-            {
-              "signature": "salary_of(employee: address) -> i128",
-              "doc": "Salary for an employee, or 0 if they are not registered."
-            },
-            {
-              "signature": "initialize(admin: address)"
-            },
-            {
-              "signature": "set_salary(employee: address, amount: i128)",
-              "doc": "Add or update an employee's salary band."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-05T00:47:14.326Z",
-      "lastChanged": "2026-08-05T00:47:14.326Z"
-    },
-    {
-      "id": "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-      "kind": "deployment",
-      "title": "pay-token @ testnet",
-      "summary": "Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-        "alias": "pay-token",
-        "drift": "unknown"
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
-    },
-    {
-      "id": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-      "kind": "deployment",
-      "title": "payroll @ testnet",
-      "summary": "Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-        "onChainWasmHash": "827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c",
-        "alias": "payroll",
-        "drift": "in-sync",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "pay(employee: address) -> Result<i128, PayrollError>",
-              "doc": "Pay one employee their band's salary out of the treasury."
-            },
-            {
-              "signature": "last_paid(employee: address) -> u32",
-              "doc": "Ledger sequence at which this employee was last paid, or 0."
-            },
-            {
-              "signature": "initialize(admin: address, treasury_id: address, registry_id: address, pay_token: address)"
-            },
-            {
-              "signature": "set_pay_token(token: address)",
-              "doc": "Change the token salaries are paid in."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-05T00:47:14.326Z",
-      "lastChanged": "2026-08-05T00:47:14.326Z"
-    },
-    {
-      "id": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-      "kind": "deployment",
-      "title": "treasury @ testnet",
-      "summary": "Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` — out of sync with local source.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-        "onChainWasmHash": "22061e7106ce20126772b4eeb87a729239b27673a8e146228b630b958f5b235c",
-        "alias": "treasury",
-        "drift": "stale",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "fund(token: address, amount: i128) -> Result<i128, TreasuryError>",
-              "doc": "Add funds for a given token. Only the admin may do this."
-            },
-            {
-              "signature": "balance(token: address) -> i128",
-              "doc": "Current balance for a token."
-            },
-            {
-              "signature": "withdraw(token: address, to: address, amount: i128) -> Result<i128, TreasuryError>",
-              "doc": "Release funds to an employee. Callable only by the payroll contract."
-            },
-            {
-              "signature": "initialize(admin: address, payroll: address)",
-              "doc": "Set the admin and the payroll contract that may draw from this treasury."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-05T00:47:14.326Z",
-      "lastChanged": "2026-08-05T00:48:10.643Z"
-    },
-    {
       "id": "project:private-payroll",
       "kind": "project",
       "title": "private-payroll",
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
         "branch": "master",
-        "head": "9ea01f5b2d75d80477196f4657b94bab481cce91",
-        "lastCommitDate": "2026-08-04T23:16:24-05:00",
-        "dirtyFiles": 5
+        "head": "406314f83480a5ecabe2f01cb3d7c7333028e650",
+        "lastCommitDate": "2026-08-05T09:25:46-05:00",
+        "dirtyFiles": 4
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "9ea01f5b2d75d80477196f4657b94bab481cce91"
+          "ref": "406314f83480a5ecabe2f01cb3d7c7333028e650"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T13:30:11.835Z"
+      "lastChanged": "2026-08-05T15:42:25.313Z"
     }
   ],
   "edges": [
@@ -2372,43 +2195,6 @@
       "provenance": []
     },
     {
-      "from": "contract:EmployeeRegistry",
-      "to": "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-      "kind": "deployed_as",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
-      "from": "contract:Payroll",
-      "to": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-      "kind": "deployed_as",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
-      "from": "contract:Treasury",
-      "to": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-      "kind": "deployed_as",
-      "note": "deployed build is older than source",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
       "from": "project:private-payroll",
       "to": "contract:EmployeeRegistry",
       "kind": "defines",
@@ -2619,6 +2405,31 @@
       "edgeCount": 73,
       "changed": [
         "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T15:40:05.808Z",
+      "commit": "406314f83480a5ecabe2f01cb3d7c7333028e650",
+      "nodeCount": 55,
+      "edgeCount": 73,
+      "changed": [
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T15:42:25.313Z",
+      "commit": "406314f83480a5ecabe2f01cb3d7c7333028e650",
+      "nodeCount": 51,
+      "edgeCount": 70,
+      "changed": [
+        "contract:EmployeeRegistry",
+        "contract:Payroll",
+        "contract:Treasury",
+        "project:private-payroll",
+        "removed:deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
+        "removed:deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "removed:deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
+        "removed:deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R"
       ]
     }
   ]
