@@ -13,7 +13,7 @@ tags:
 <!-- stellar-memory:auto -->
 # balance
 
-**Source:** `contracts/treasury/src/lib.rs:89`
+**Source:** `contracts/treasury/src/lib.rs:91`
 
 ## Signature
 
@@ -33,7 +33,7 @@ fn balance(env: Env, token: Address) -> i128
 
 <details><summary>Where this came from</summary>
 
-- Parsed from `contracts/treasury/src/lib.rs:89`
+- Parsed from `contracts/treasury/src/lib.rs:91`
 
 </details>
 <!-- /stellar-memory:auto -->

@@ -24,7 +24,12 @@ import type {
 } from '../core/types.js';
 import { readGitInfo, type GitInfo } from '../core/git.js';
 import { readFileSafe, walkRepo, type FileEntry } from './walk.js';
-import { analyseRustFile, type RustFileAnalysis } from './rust.js';
+import {
+  analyseRustFile,
+  collectHelpersFrom,
+  type HelperFn,
+  type RustFileAnalysis,
+} from './rust.js';
 import {
   isContractCrate,
   legacyWasmArtifactPath,
@@ -178,10 +183,28 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
   /** module name used in `contractimport!` -> importing contract. */
   const importsByFile = new Map<string, RustFileAnalysis>();
 
+  // Rust modules are crate-scoped: `mod balance;` puts helper functions in a
+  // sibling file. Gather every crate's free functions before analysing any file,
+  // or a contract whose storage lives in admin.rs / balance.rs / allowance.rs —
+  // the canonical token layout — appears to touch no storage at all.
+  const sources = new Map<string, string>();
+  const helpersByCrate = new Map<string, Map<string, HelperFn>>();
   for (const file of rustFiles) {
     const source = await readFileSafe(file);
     if (!source) continue;
-    const analysis = analyseRustFile(file.rel, source);
+    sources.set(file.rel, source);
+
+    const crateKey = crateForPath(file.rel)?.dir ?? '.';
+    const bucket = helpersByCrate.get(crateKey) ?? new Map<string, HelperFn>();
+    for (const [name, helper] of collectHelpersFrom(source)) bucket.set(name, helper);
+    helpersByCrate.set(crateKey, bucket);
+  }
+
+  for (const file of rustFiles) {
+    const source = sources.get(file.rel);
+    if (!source) continue;
+    const crateKey = crateForPath(file.rel)?.dir ?? '.';
+    const analysis = analyseRustFile(file.rel, source, helpersByCrate.get(crateKey));
     analyses.push(analysis);
     importsByFile.set(file.rel, analysis);
 
@@ -296,6 +319,13 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
           const node = nodes.get(storageId)!;
           (node.data as unknown as StorageData).hasTtlExtension = storageData.hasTtlExtension;
 
+          // Extending a TTL is neither a read of the value nor a mutation of it
+          // — it is maintenance on the entry's lifetime. Counting it as a write
+          // flagged every getter that refreshes TTL on read, which is the
+          // canonical Soroban pattern, as an unauthenticated mutation. The TTL
+          // fact itself is recorded on the storage node.
+          if (access.op === 'extend_ttl') continue;
+
           const kind = access.op === 'get' || access.op === 'try_get' || access.op === 'has'
             ? 'reads'
             : 'writes';
@@ -314,7 +344,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
           if (!fn.returns?.includes(error.name)) continue;
           addEdge({
             from: fnId,
-            to: `error:${error.name}`,
+            to: `error:${crate?.name ?? 'unknown'}.${error.name}`,
             kind: 'raises',
             provenance: [{ source: 'source', file: file.rel, line: fn.line }],
           });
@@ -385,9 +415,14 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
       }
     }
 
+    // Rust types are crate-scoped, and `#[contracterror] pub enum Error` is
+    // near-universal — without the crate in the id, every crate's Error merged
+    // into one node carrying whichever variants were parsed last.
+    const scope = crate?.name ?? 'unknown';
+
     for (const t of analysis.types) {
       addNode({
-        id: `type:${t.name}`,
+        id: `type:${scope}.${t.name}`,
         kind: 'type',
         title: t.name,
         path: file.rel,
@@ -399,7 +434,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
     for (const e of analysis.errors) {
       const errorData: ErrorData = { variants: e.variants };
       addNode({
-        id: `error:${e.name}`,
+        id: `error:${scope}.${e.name}`,
         kind: 'error',
         title: e.name,
         path: file.rel,
@@ -414,7 +449,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
     }
     for (const e of analysis.events) {
       addNode({
-        id: `event:${e.name}`,
+        id: `event:${scope}.${e.name}`,
         kind: 'event',
         title: e.name,
         path: file.rel,
@@ -968,8 +1003,9 @@ async function recordDeployment(
     // Error discriminants are ABI. Comparing the deployed spec against source
     // catches a renumbered variant — a break that is otherwise invisible until
     // a client starts misreporting failures.
+    const matchedCrate = (matched.data as unknown as ContractData | undefined)?.crate ?? 'unknown';
     for (const deployed of spec.errors) {
-      const sourceNode = nodes.get(`error:${deployed.name}`);
+      const sourceNode = nodes.get(`error:${matchedCrate}.${deployed.name}`);
       const sourceData = sourceNode?.data as unknown as ErrorData | undefined;
       if (!sourceNode || !sourceData?.variants?.length || !deployed.cases?.length) continue;
 

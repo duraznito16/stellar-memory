@@ -37,7 +37,7 @@ fn pay(env: Env, employee: Address) -> Result<i128, PayrollError>
 - [[storage/payroll.persistent.datakey-lastpaid-employee|DataKey::LastPaid(employee) (persistent)]] — `set`
 
 **Can fail with**
-- [[errors/payrollerror|PayrollError]]
+- [[errors/payroll.payrollerror|PayrollError]]
 
 **Emits**
 - [[events/payroll.paid|paid]]

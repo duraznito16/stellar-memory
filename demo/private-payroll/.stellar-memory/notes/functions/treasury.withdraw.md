@@ -35,7 +35,7 @@ fn withdraw(env: Env, token: Address, to: Address, amount: i128) -> Result<i128,
 - [[storage/treasury.persistent.datakey-balance-token|DataKey::Balance(token) (persistent)]] — `set`
 
 **Can fail with**
-- [[errors/treasuryerror|TreasuryError]]
+- [[errors/treasury.treasuryerror|TreasuryError]]
 
 **Calls**
 - [[assets/token.token|Token (token)]] — calls `transfer`

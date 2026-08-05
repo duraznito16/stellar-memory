@@ -168,7 +168,7 @@ export interface RustFileAnalysis {
  * storage surface of such a contract invisible, and turned every helper-resolved
  * admin into an unknown auth subject.
  */
-interface HelperFn {
+export interface HelperFn {
   storage: StorageAccess[];
   events: string[];
   clientCalls: string[];
@@ -176,7 +176,29 @@ interface HelperFn {
   returnsStorageKey?: string;
 }
 
-export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
+/**
+ * The free functions a file exports to the rest of its crate.
+ *
+ * Rust modules are crate-scoped, so `mod balance;` puts helpers in a sibling
+ * file. Collecting them per-file meant a canonical token — whose storage lives
+ * in admin.rs, balance.rs and allowance.rs — produced no storage nodes at all,
+ * and the `has()` re-initialization guard in a sibling module went unseen,
+ * bringing back a false positive on correct code. Callers should gather these
+ * across a crate and pass them back in.
+ */
+export function collectHelpersFrom(source: string): Map<string, HelperFn> {
+  const src = stripComments(source);
+  return collectFreeFunctions(
+    src,
+    collectContractImpls(src).map((i) => [i.bodyStart, i.bodyEnd] as [number, number]),
+  );
+}
+
+export function analyseRustFile(
+  rel: string,
+  source: string,
+  crateHelpers?: Map<string, HelperFn>,
+): RustFileAnalysis {
   const src = stripComments(source);
 
   const analysis: RustFileAnalysis = {
@@ -197,10 +219,14 @@ export function analyseRustFile(rel: string, source: string): RustFileAnalysis {
 
   const contractNames = collectContractNames(src);
   const impls = collectContractImpls(src);
-  const helpers = collectFreeFunctions(
+  // Helpers defined here win over same-named ones from sibling modules.
+  const helpers = new Map(crateHelpers ?? []);
+  for (const [name, helper] of collectFreeFunctions(
     src,
     impls.map((i) => [i.bodyStart, i.bodyEnd] as [number, number]),
-  );
+  )) {
+    helpers.set(name, helper);
+  }
 
   // A `#[contractimpl]` block is where the public interface lives. Group the
   // impl blocks by the type they implement so partial impls merge into one

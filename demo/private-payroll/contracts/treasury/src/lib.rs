@@ -85,12 +85,13 @@ impl Treasury {
         Ok(remaining)
     }
 
-    /// Current balance for a token.
+    /// Current balance for a token. Refreshes the entry's TTL on read, which is
+    /// the idiomatic way to keep a hot key alive — it is maintenance, not a
+    /// state change, and needs no authorization.
     pub fn balance(env: Env, token: Address) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(token))
-            .unwrap_or(0)
+        let key = DataKey::Balance(token);
+        env.storage().persistent().extend_ttl(&key, 100_000, 200_000);
+        env.storage().persistent().get(&key).unwrap_or(0)
     }
 
     /// The payroll contract currently allowed to draw from this treasury.

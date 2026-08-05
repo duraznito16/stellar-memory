@@ -9,24 +9,14 @@ last_changed: 2026-08-04T23:23:28.099Z
 tags:
   - stellar-memory
   - kind/type
+stale: true
+stale_since: 2026-08-05
 ---
 
 <!-- stellar-memory:auto -->
-# DataKey
-
-Contract type (`#[contracttype]`).
-
-**Source:** `contracts/employee-registry/src/lib.rs:4`
-
----
-
-<details><summary>Where this came from</summary>
-
-- Parsed from `contracts/employee-registry/src/lib.rs:4`
-- Parsed from `contracts/payroll/src/lib.rs:16`
-- Parsed from `contracts/treasury/src/lib.rs:4`
-
-</details>
+> [!warning] No longer present
+> This was last seen in the project on 2026-08-04T23:23:28.099Z.
+> The scan on 2026-08-05 did not find it. Your own notes below are preserved.
 <!-- /stellar-memory:auto -->
 
 ## Notes

@@ -344,7 +344,7 @@
       "lastChanged": "2026-08-04T23:23:28.099Z"
     },
     {
-      "id": "type:DataKey",
+      "id": "type:employee-registry.DataKey",
       "kind": "type",
       "title": "DataKey",
       "path": "contracts/employee-registry/src/lib.rs",
@@ -355,20 +355,10 @@
           "source": "source",
           "file": "contracts/employee-registry/src/lib.rs",
           "line": 4
-        },
-        {
-          "source": "source",
-          "file": "contracts/payroll/src/lib.rs",
-          "line": 16
-        },
-        {
-          "source": "source",
-          "file": "contracts/treasury/src/lib.rs",
-          "line": 4
         }
       ],
-      "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
+      "firstSeen": "2026-08-05T04:15:44.462Z",
+      "lastChanged": "2026-08-05T04:15:44.462Z"
     },
     {
       "id": "contract:Payroll",
@@ -721,7 +711,24 @@
       "lastChanged": "2026-08-04T23:23:28.099Z"
     },
     {
-      "id": "error:PayrollError",
+      "id": "type:payroll.DataKey",
+      "kind": "type",
+      "title": "DataKey",
+      "path": "contracts/payroll/src/lib.rs",
+      "line": 16,
+      "summary": "Contract type (`#[contracttype]`).",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/payroll/src/lib.rs",
+          "line": 16
+        }
+      ],
+      "firstSeen": "2026-08-05T04:15:44.462Z",
+      "lastChanged": "2026-08-05T04:15:44.462Z"
+    },
+    {
+      "id": "error:payroll.PayrollError",
       "kind": "error",
       "title": "PayrollError",
       "path": "contracts/payroll/src/lib.rs",
@@ -754,8 +761,8 @@
           "line": 28
         }
       ],
-      "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T03:42:03.854Z"
+      "firstSeen": "2026-08-05T04:15:44.462Z",
+      "lastChanged": "2026-08-05T04:15:44.462Z"
     },
     {
       "id": "test:contracts/payroll/src/test.rs",
@@ -797,7 +804,7 @@
           "payroll_address"
         ],
         "wasmPath": "target/wasm32v1-none/release/treasury.wasm",
-        "localWasmHash": "cb696a5f0f15c833d6b2f4b9a148dfd91b5eccb82bef0236ad83dd27b6305746"
+        "localWasmHash": "eaf0965402d93d78878a9ae409f0c1996d0f967492983926cc59d60aa347873b"
       },
       "provenance": [
         {
@@ -811,7 +818,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T03:43:28.401Z"
+      "lastChanged": "2026-08-05T04:15:44.462Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -905,7 +912,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 98
+          "line": 99
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -999,7 +1006,12 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 90
+          "line": 93
+        },
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 94
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -1115,7 +1127,7 @@
       "kind": "function",
       "title": "balance",
       "path": "contracts/treasury/src/lib.rs",
-      "line": 89,
+      "line": 91,
       "data": {
         "params": [
           {
@@ -1135,7 +1147,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 89
+          "line": 91
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
@@ -1146,7 +1158,7 @@
       "kind": "function",
       "title": "payroll_address",
       "path": "contracts/treasury/src/lib.rs",
-      "line": 97,
+      "line": 98,
       "data": {
         "params": [
           {
@@ -1162,14 +1174,31 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 97
+          "line": 98
         }
       ],
       "firstSeen": "2026-08-05T00:48:10.643Z",
       "lastChanged": "2026-08-05T00:48:10.643Z"
     },
     {
-      "id": "error:TreasuryError",
+      "id": "type:treasury.DataKey",
+      "kind": "type",
+      "title": "DataKey",
+      "path": "contracts/treasury/src/lib.rs",
+      "line": 4,
+      "summary": "Contract type (`#[contracttype]`).",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/treasury/src/lib.rs",
+          "line": 4
+        }
+      ],
+      "firstSeen": "2026-08-05T04:15:44.462Z",
+      "lastChanged": "2026-08-05T04:15:44.462Z"
+    },
+    {
+      "id": "error:treasury.TreasuryError",
       "kind": "error",
       "title": "TreasuryError",
       "path": "contracts/treasury/src/lib.rs",
@@ -1198,8 +1227,8 @@
           "line": 15
         }
       ],
-      "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T03:42:03.854Z"
+      "firstSeen": "2026-08-05T04:15:44.462Z",
+      "lastChanged": "2026-08-05T04:15:44.462Z"
     },
     {
       "id": "test:contracts/treasury/src/test.rs",
@@ -1523,18 +1552,18 @@
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
         "branch": "master",
-        "head": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b",
-        "lastCommitDate": "2026-08-04T22:07:20-05:00",
-        "dirtyFiles": 19
+        "head": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df",
+        "lastCommitDate": "2026-08-04T22:45:56-05:00",
+        "dirtyFiles": 6
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "4d39d751b7c0450784f3fabbf9127a3b59d26e6b"
+          "ref": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T03:43:28.401Z"
+      "lastChanged": "2026-08-05T04:15:44.462Z"
     }
   ],
   "edges": [
@@ -1863,7 +1892,7 @@
     },
     {
       "from": "function:Payroll.pay",
-      "to": "error:PayrollError",
+      "to": "error:payroll.PayrollError",
       "kind": "raises",
       "provenance": [
         {
@@ -2049,7 +2078,7 @@
     },
     {
       "from": "function:Treasury.fund",
-      "to": "error:TreasuryError",
+      "to": "error:treasury.TreasuryError",
       "kind": "raises",
       "provenance": [
         {
@@ -2124,7 +2153,7 @@
     },
     {
       "from": "function:Treasury.withdraw",
-      "to": "error:TreasuryError",
+      "to": "error:treasury.TreasuryError",
       "kind": "raises",
       "provenance": [
         {
@@ -2167,7 +2196,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 89
+          "line": 91
         }
       ]
     },
@@ -2180,7 +2209,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 90
+          "line": 94
         }
       ]
     },
@@ -2192,7 +2221,7 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 97
+          "line": 98
         }
       ]
     },
@@ -2205,19 +2234,19 @@
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 98
+          "line": 99
         }
       ]
     },
     {
       "from": "function:Treasury.payroll_address",
-      "to": "error:TreasuryError",
+      "to": "error:treasury.TreasuryError",
       "kind": "raises",
       "provenance": [
         {
           "source": "source",
           "file": "contracts/treasury/src/lib.rs",
-          "line": 97
+          "line": 98
         }
       ]
     },
@@ -2554,6 +2583,33 @@
         "contract:Treasury",
         "asset:Token.token",
         "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T04:12:21.903Z",
+      "commit": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df",
+      "nodeCount": 53,
+      "edgeCount": 73,
+      "changed": [
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-05T04:15:44.462Z",
+      "commit": "b9aa82c53f61f17a0472cfcd8f00e42cc0b789df",
+      "nodeCount": 55,
+      "edgeCount": 73,
+      "changed": [
+        "type:employee-registry.DataKey",
+        "type:payroll.DataKey",
+        "error:payroll.PayrollError",
+        "contract:Treasury",
+        "type:treasury.DataKey",
+        "error:treasury.TreasuryError",
+        "project:private-payroll",
+        "removed:type:DataKey",
+        "removed:error:PayrollError",
+        "removed:error:TreasuryError"
       ]
     }
   ]

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyseRustFile, stripComments } from '../src/scanner/rust.ts';
+import { analyseRustFile, collectHelpersFrom, stripComments } from '../src/scanner/rust.ts';
 
 /**
  * A contract written the way real Soroban code is written, including the things
@@ -463,6 +463,49 @@ impl P {
   assert.equal(call.kind, 'generated');
   assert.equal(call.client, 'treasury');
   assert.deepEqual(call.methods, ['withdraw']);
+});
+
+test('resolves helpers defined in a sibling module of the same crate', () => {
+  // Rust modules are crate-scoped: `mod balance;` puts the helper in another
+  // file. Collecting helpers per-file meant a canonical token — storage in
+  // admin.rs and balance.rs — produced no storage nodes at all, and a `has()`
+  // guard in a sibling module went unseen, resurrecting a false positive.
+  const adminRs = `
+use soroban_sdk::{Address, Env};
+pub fn has_admin(e: &Env) -> bool { e.storage().instance().has(&DataKey::Admin) }
+pub fn read_admin(e: &Env) -> Address { e.storage().instance().get(&DataKey::Admin).unwrap() }
+`;
+  const libRs = `
+use soroban_sdk::{contract, contractimpl, Address, Env};
+pub mod admin;
+use crate::admin::{has_admin, read_admin};
+
+#[contract]
+pub struct Token;
+#[contractimpl]
+impl Token {
+    pub fn set_admin(e: Env, new_admin: Address) {
+        let admin = read_admin(&e);
+        admin.require_auth();
+        e.storage().instance().set(&DataKey::Admin, &new_admin);
+    }
+}
+`;
+
+  // Without the crate's helpers the subject is unresolvable...
+  const isolated = analyseRustFile('lib.rs', libRs).contracts[0]!.functions[0]!;
+  assert.equal(isolated.authSubjects[0]?.origin, 'unknown');
+
+  // ...and with them it resolves to the storage key that actually gates it.
+  const crateHelpers = collectHelpersFrom(adminRs);
+  const withCrate = analyseRustFile('lib.rs', libRs, crateHelpers).contracts[0]!.functions[0]!;
+  assert.equal(withCrate.authSubjects[0]?.origin, 'storage');
+  assert.equal(withCrate.authSubjects[0]?.key, 'DataKey::Admin');
+
+  // The sibling module's `has` guard must be visible too, or a guarded
+  // initializer gets reported as unguarded.
+  assert.ok(crateHelpers.has('has_admin'));
+  assert.ok(crateHelpers.get('has_admin')!.storage.some((s) => s.op === 'has'));
 });
 
 test('a plain Rust file yields no contracts', () => {
