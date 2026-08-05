@@ -1,5 +1,8 @@
 # stellar-memory
 
+[![CI](https://github.com/duraznito16/stellar-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/duraznito16/stellar-memory/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/soroban-memory)](https://www.npmjs.com/package/soroban-memory)
+
 **A persistent memory layer for Stellar and Soroban projects.**
 
 Current AI assistants help you *write* code. The harder problem is *keeping* the
@@ -230,6 +233,28 @@ node dist/index.js --cwd demo/private-payroll init
 node dist/index.js --cwd demo/private-payroll scan
 node dist/index.js --cwd demo/private-payroll resume
 ```
+
+## What CI proves
+
+The badge above is not just "the tests pass". Every push runs the tool against
+the demo Soroban workspace and asserts what it claims:
+
+- **The parser agrees with the compiler.** The demo is built to Wasm, and the
+  public functions the analyser reports are compared against the spec embedded
+  in the compiled binary. Static analysis validated against `rustc`, not against
+  opinion.
+- **The gate works in all three states.** It fires on a category the demo
+  genuinely fails, stays quiet on one it is clean on, and exits `2` — not `0` —
+  on an unknown category, so a typo cannot turn a pipeline green.
+- **The published artifact runs on the minimum supported Node.** The test suite
+  runs on Node 24; the built CLI is exercised end to end on Node 20.
+- **On-chain drift is checked against real testnet deployments.** Contract
+  aliases are committed, so this needs no credentials — and every call is
+  read-only.
+
+That last job is `continue-on-error`. Testnet is reset periodically and these
+contracts will vanish with it; that is a fact about the network, not a defect
+here, and blocking merges on it would only train people to ignore the badge.
 
 ## Development
 
