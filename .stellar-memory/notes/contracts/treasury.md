@@ -4,8 +4,8 @@ kind: contract
 title: Treasury
 path: demo/private-payroll/contracts/treasury/src/lib.rs
 summary: Soroban contract with 5 public functions.
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/contract
@@ -27,9 +27,6 @@ Soroban contract with 5 public functions.
 - `payroll_address(env: Env) -> Result<Address, TreasuryError>` — [[functions/treasury.payroll_address|payroll_address]]
 
 ## Connections
-
-**Deployed as**
-- [[deployments/testnet.cdnr3wxjiy7gczgy6kkfuw3bv3h5k654y4iipd4zwurhngkfhhyare4r|treasury @ testnet]]
 
 **Defined in**
 - [[crates/treasury|treasury]]

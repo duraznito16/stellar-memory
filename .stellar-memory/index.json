@@ -29,8 +29,8 @@
           "file": "demo/private-payroll/contracts/employee-registry/Cargo.toml"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "crate:payroll",
@@ -54,8 +54,8 @@
           "file": "demo/private-payroll/contracts/payroll/Cargo.toml"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "crate:treasury",
@@ -77,8 +77,8 @@
           "file": "demo/private-payroll/contracts/treasury/Cargo.toml"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "contract:EmployeeRegistry",
@@ -103,8 +103,8 @@
           "line": 12
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:EmployeeRegistry.initialize",
@@ -140,8 +140,8 @@
           "line": 17
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:EmployeeRegistry.instance.DataKey::Admin",
@@ -171,8 +171,8 @@
           "line": 37
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:EmployeeRegistry.set_salary",
@@ -213,8 +213,8 @@
           "line": 23
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:EmployeeRegistry.persistent.DataKey::Salary(employee)",
@@ -249,8 +249,8 @@
           "line": 46
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "event:EmployeeRegistry.salary_set",
@@ -266,8 +266,8 @@
           "line": 23
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:EmployeeRegistry.remove",
@@ -304,8 +304,8 @@
           "line": 36
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:EmployeeRegistry.salary_of",
@@ -335,8 +335,8 @@
           "line": 45
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "type:employee-registry.DataKey",
@@ -352,8 +352,8 @@
           "line": 4
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "contract:Payroll",
@@ -378,8 +378,8 @@
           "line": 38
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Payroll.initialize",
@@ -427,8 +427,8 @@
           "line": 43
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Payroll.instance.DataKey::Admin",
@@ -453,8 +453,8 @@
           "line": 60
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Payroll.instance.DataKey::Treasury",
@@ -479,8 +479,8 @@
           "line": 78
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Payroll.instance.DataKey::Registry",
@@ -505,8 +505,8 @@
           "line": 67
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Payroll.instance.DataKey::PayToken",
@@ -536,8 +536,8 @@
           "line": 105
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Payroll.pay",
@@ -575,8 +575,8 @@
           "line": 58
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Payroll.persistent.DataKey::LastPaid(employee)",
@@ -601,8 +601,8 @@
           "line": 112
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "event:Payroll.paid",
@@ -618,8 +618,8 @@
           "line": 58
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Payroll.set_pay_token",
@@ -648,8 +648,8 @@
           "line": 104
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "event:Payroll.token_changed",
@@ -665,8 +665,8 @@
           "line": 104
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Payroll.last_paid",
@@ -696,8 +696,8 @@
           "line": 111
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "type:payroll.DataKey",
@@ -713,8 +713,8 @@
           "line": 16
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "error:payroll.PayrollError",
@@ -741,8 +741,7 @@
             "name": "NotInitialized",
             "code": 4
           }
-        ],
-        "deployedCheck": "matches"
+        ]
       },
       "provenance": [
         {
@@ -751,8 +750,8 @@
           "line": 28
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T22:23:18.191Z"
     },
     {
       "id": "test:demo/private-payroll/contracts/payroll/src/test.rs",
@@ -770,8 +769,8 @@
           "file": "demo/private-payroll/contracts/payroll/src/test.rs"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z",
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z",
       "data": {
         "mocksAllAuths": true,
         "testCount": 1
@@ -801,8 +800,8 @@
           "line": 24
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -842,8 +841,8 @@
           "line": 30
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Treasury.instance.DataKey::Admin",
@@ -868,8 +867,8 @@
           "line": 39
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Treasury.instance.DataKey::Payroll",
@@ -899,8 +898,8 @@
           "line": 99
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Treasury.fund",
@@ -942,8 +941,8 @@
           "line": 37
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "storage:Treasury.persistent.DataKey::Balance(token)",
@@ -998,8 +997,8 @@
           "line": 94
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "event:Treasury.funded",
@@ -1015,8 +1014,8 @@
           "line": 37
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Treasury.withdraw",
@@ -1062,8 +1061,8 @@
           "line": 56
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "asset:Token.token",
@@ -1086,8 +1085,8 @@
           "line": 56
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "event:Treasury.withdrawn",
@@ -1103,8 +1102,8 @@
           "line": 56
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Treasury.balance",
@@ -1134,8 +1133,8 @@
           "line": 91
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "function:Treasury.payroll_address",
@@ -1161,8 +1160,8 @@
           "line": 98
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "type:treasury.DataKey",
@@ -1178,8 +1177,8 @@
           "line": 4
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "error:treasury.TreasuryError",
@@ -1202,8 +1201,7 @@
             "name": "NotInitialized",
             "code": 3
           }
-        ],
-        "deployedCheck": "matches"
+        ]
       },
       "provenance": [
         {
@@ -1212,8 +1210,8 @@
           "line": 15
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T22:23:18.191Z"
     },
     {
       "id": "test:demo/private-payroll/contracts/treasury/src/test.rs",
@@ -1231,8 +1229,8 @@
           "file": "demo/private-payroll/contracts/treasury/src/test.rs"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z",
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z",
       "data": {
         "mocksAllAuths": true,
         "testCount": 3
@@ -1250,8 +1248,8 @@
           "file": ".claude/agents/mcp-tooling.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:.claude/agents/memory-vault.md",
@@ -1265,8 +1263,8 @@
           "file": ".claude/agents/memory-vault.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:.claude/agents/release-verify.md",
@@ -1280,8 +1278,8 @@
           "file": ".claude/agents/release-verify.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:.claude/agents/soroban-analyzer.md",
@@ -1295,8 +1293,8 @@
           "file": ".claude/agents/soroban-analyzer.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:.claude/agents/stellar-onchain.md",
@@ -1310,8 +1308,8 @@
           "file": ".claude/agents/stellar-onchain.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:demo/private-payroll/README.md",
@@ -1325,8 +1323,8 @@
           "file": "demo/private-payroll/README.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:docs/ROADMAP.md",
@@ -1340,8 +1338,8 @@
           "file": "docs/ROADMAP.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:README.md",
@@ -1355,8 +1353,8 @@
           "file": "README.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:templates/agents/stellar-archivist.md",
@@ -1370,8 +1368,8 @@
           "file": "templates/agents/stellar-archivist.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:templates/agents/stellar-builder.md",
@@ -1385,8 +1383,8 @@
           "file": "templates/agents/stellar-builder.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:templates/agents/stellar-debugger.md",
@@ -1400,8 +1398,8 @@
           "file": "templates/agents/stellar-debugger.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:templates/agents/stellar-explorer.md",
@@ -1415,8 +1413,8 @@
           "file": "templates/agents/stellar-explorer.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "doc:templates/agents/stellar-resume.md",
@@ -1430,8 +1428,8 @@
           "file": "templates/agents/stellar-resume.md"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "script:.github/workflows/ci.yml",
@@ -1445,8 +1443,8 @@
           "file": ".github/workflows/ci.yml"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "script:demo/private-payroll/scripts/deploy.sh",
@@ -1460,8 +1458,8 @@
           "file": "demo/private-payroll/scripts/deploy.sh"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/contracts/payroll/src/lib.rs#91",
@@ -1480,8 +1478,8 @@
           "line": 91
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/contracts/payroll/src/lib.rs#103",
@@ -1497,8 +1495,8 @@
           "line": 103
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/contracts/payroll/src/test.rs#23",
@@ -1517,8 +1515,8 @@
           "line": 23
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/README.md#24",
@@ -1534,8 +1532,8 @@
           "line": 24
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/README.md#25",
@@ -1551,8 +1549,8 @@
           "line": 25
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "task:demo/private-payroll/scripts/deploy.sh#32",
@@ -1568,168 +1566,8 @@
           "line": 32
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
-    },
-    {
-      "id": "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-      "kind": "deployment",
-      "title": "employee-registry @ testnet",
-      "summary": "Live at `CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-        "onChainWasmHash": "92065fb36f832750f5b6b1144e1731ef6fab5e47e80009c7bb6742fc3c3c497b",
-        "alias": "employee-registry",
-        "drift": "unknown",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "remove(employee: address)",
-              "doc": "Remove an employee from the registry."
-            },
-            {
-              "signature": "salary_of(employee: address) -> i128",
-              "doc": "Salary for an employee, or 0 if they are not registered."
-            },
-            {
-              "signature": "initialize(admin: address)"
-            },
-            {
-              "signature": "set_salary(employee: address, amount: i128)",
-              "doc": "Add or update an employee's salary band."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
-    },
-    {
-      "id": "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-      "kind": "deployment",
-      "title": "pay-token @ testnet",
-      "summary": "Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-        "alias": "pay-token",
-        "drift": "unknown"
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info interface --id CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
-    },
-    {
-      "id": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-      "kind": "deployment",
-      "title": "payroll @ testnet",
-      "summary": "Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-        "onChainWasmHash": "827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c",
-        "alias": "payroll",
-        "drift": "unknown",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "pay(employee: address) -> Result<i128, PayrollError>",
-              "doc": "Pay one employee their band's salary out of the treasury."
-            },
-            {
-              "signature": "last_paid(employee: address) -> u32",
-              "doc": "Ledger sequence at which this employee was last paid, or 0."
-            },
-            {
-              "signature": "initialize(admin: address, treasury_id: address, registry_id: address, pay_token: address)"
-            },
-            {
-              "signature": "set_pay_token(token: address)",
-              "doc": "Change the token salaries are paid in."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
-    },
-    {
-      "id": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-      "kind": "deployment",
-      "title": "treasury @ testnet",
-      "summary": "Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R`.",
-      "data": {
-        "network": "testnet",
-        "contractId": "CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-        "onChainWasmHash": "22061e7106ce20126772b4eeb87a729239b27673a8e146228b630b958f5b235c",
-        "alias": "treasury",
-        "drift": "unknown",
-        "meta": {
-          "rsver": "1.97.1",
-          "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
-        },
-        "interface": {
-          "functions": [
-            {
-              "signature": "fund(token: address, amount: i128) -> Result<i128, TreasuryError>",
-              "doc": "Add funds for a given token. Only the admin may do this."
-            },
-            {
-              "signature": "balance(token: address) -> i128",
-              "doc": "Current balance for a token."
-            },
-            {
-              "signature": "withdraw(token: address, to: address, amount: i128) -> Result<i128, TreasuryError>",
-              "doc": "Release funds to an employee. Callable only by the payroll contract."
-            },
-            {
-              "signature": "initialize(admin: address, payroll: address)",
-              "doc": "Set the admin and the payroll contract that may draw from this treasury."
-            }
-          ],
-          "events": []
-        }
-      },
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-          "network": "testnet"
-        }
-      ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T18:12:12.243Z"
     },
     {
       "id": "project:Semillero",
@@ -1738,18 +1576,18 @@
       "summary": "**A persistent memory layer for Stellar and Soroban projects.**",
       "data": {
         "branch": "master",
-        "head": "a79ca46f94497b9c4c85aaf72ad65ca97a7f3112",
-        "lastCommitDate": "2026-08-06T00:38:01-05:00",
-        "dirtyFiles": 75
+        "head": "b3934a9d1b73500f6f606882ae5a7d7b0c8b04b3",
+        "lastCommitDate": "2026-08-06T00:46:12-05:00",
+        "dirtyFiles": 69
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "a79ca46f94497b9c4c85aaf72ad65ca97a7f3112"
+          "ref": "b3934a9d1b73500f6f606882ae5a7d7b0c8b04b3"
         }
       ],
-      "firstSeen": "2026-08-06T05:42:08.159Z",
-      "lastChanged": "2026-08-06T05:42:08.159Z"
+      "firstSeen": "2026-08-06T18:12:12.243Z",
+      "lastChanged": "2026-08-06T22:23:18.191Z"
     }
   ],
   "edges": [
@@ -2738,42 +2576,6 @@
       "provenance": []
     },
     {
-      "from": "contract:EmployeeRegistry",
-      "to": "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
-      "kind": "deployed_as",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
-      "from": "contract:Payroll",
-      "to": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
-      "kind": "deployed_as",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
-      "from": "contract:Treasury",
-      "to": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
-      "kind": "deployed_as",
-      "provenance": [
-        {
-          "source": "stellar-cli",
-          "command": "stellar contract alias ls",
-          "network": "testnet"
-        }
-      ]
-    },
-    {
       "from": "project:Semillero",
       "to": "contract:EmployeeRegistry",
       "kind": "defines",
@@ -2794,8 +2596,8 @@
   ],
   "scans": [
     {
-      "at": "2026-08-06T05:42:08.159Z",
-      "commit": "a79ca46f94497b9c4c85aaf72ad65ca97a7f3112",
+      "at": "2026-08-06T18:12:12.243Z",
+      "commit": "b3934a9d1b73500f6f606882ae5a7d7b0c8b04b3",
       "nodeCount": 68,
       "edgeCount": 89,
       "changed": [
@@ -2867,6 +2669,21 @@
         "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
         "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
         "project:Semillero"
+      ]
+    },
+    {
+      "at": "2026-08-06T22:23:18.191Z",
+      "commit": "b3934a9d1b73500f6f606882ae5a7d7b0c8b04b3",
+      "nodeCount": 64,
+      "edgeCount": 86,
+      "changed": [
+        "error:payroll.PayrollError",
+        "error:treasury.TreasuryError",
+        "project:Semillero",
+        "removed:deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
+        "removed:deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "removed:deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
+        "removed:deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R"
       ]
     }
   ]

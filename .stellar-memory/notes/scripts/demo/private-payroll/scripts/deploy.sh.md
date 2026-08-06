@@ -4,8 +4,8 @@ kind: script
 title: deploy.sh
 path: demo/private-payroll/scripts/deploy.sh
 summary: Build or deploy script.
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/script

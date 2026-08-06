@@ -4,8 +4,8 @@ kind: doc
 title: stellar-debugger.md
 path: templates/agents/stellar-debugger.md
 summary: "--- name: stellar-debugger description: Use when something is wrong — a failing test, a failed contract invocation, an unexpected on-chain result, or a warning from the project memory. Works backward from the symptom through the contract graph to the cause. Use it before the builder agent, never in…"
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/doc

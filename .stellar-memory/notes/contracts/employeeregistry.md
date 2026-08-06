@@ -4,8 +4,8 @@ kind: contract
 title: EmployeeRegistry
 path: demo/private-payroll/contracts/employee-registry/src/lib.rs
 summary: Soroban contract with 4 public functions.
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/contract
@@ -26,9 +26,6 @@ Soroban contract with 4 public functions.
 - `salary_of(env: Env, employee: Address) -> i128` — [[functions/employeeregistry.salary_of|salary_of]]
 
 ## Connections
-
-**Deployed as**
-- [[deployments/testnet.ca2uqyd63jwh5mxvemtpiweqz2eq7dlbumzrowtkbn5uflycl7o2twrn|employee-registry @ testnet]]
 
 **Defined in**
 - [[crates/employee-registry|employee-registry]]

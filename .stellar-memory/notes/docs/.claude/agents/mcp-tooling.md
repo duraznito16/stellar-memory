@@ -4,8 +4,8 @@ kind: doc
 title: mcp-tooling.md
 path: .claude/agents/mcp-tooling.md
 summary: "--- name: mcp-tooling description: Use for the agent-facing MCP surface — adding, renaming or reshaping MCP tools, their descriptions and input schemas, and the end-to-end MCP tests. Owns src/commands/mcp.ts and tests/mcp.test.ts. Use it whenever changing what an AI agent can ask the memory."
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/doc

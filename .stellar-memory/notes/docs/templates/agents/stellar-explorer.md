@@ -4,8 +4,8 @@ kind: doc
 title: stellar-explorer.md
 path: templates/agents/stellar-explorer.md
 summary: '--- name: stellar-explorer description: Use to understand how this Stellar project fits together — what the contracts are, how they call each other, what a subsystem does, where something lives. Read-only. Use it before changing anything, and whenever a question starts with "how does" or "where is".'
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/doc

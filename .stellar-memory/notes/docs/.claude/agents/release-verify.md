@@ -4,8 +4,8 @@ kind: doc
 title: release-verify.md
 path: .claude/agents/release-verify.md
 summary: "--- name: release-verify description: Use to verify the whole tool still works before a commit, a demo, or a submission. Runs typecheck, the full test suite, a clean rebuild, a real scan of the demo project, and the Soroban contract build, then reports regressions with evidence. Use it as a gate, n…"
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/doc

@@ -4,8 +4,8 @@ kind: task
 title: wire up initialize() calls here so a fresh deploy is usable immediately.
 path: demo/private-payroll/scripts/deploy.sh
 summary: TODO in `demo/private-payroll/scripts/deploy.sh:32`
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/task

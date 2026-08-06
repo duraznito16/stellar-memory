@@ -4,8 +4,8 @@ kind: crate
 title: payroll
 path: demo/private-payroll/contracts/payroll/Cargo.toml
 summary: Orchestrates confidential salary payments from the treasury to employees.
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/crate

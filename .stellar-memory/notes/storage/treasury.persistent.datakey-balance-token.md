@@ -3,8 +3,8 @@ id: storage:Treasury.persistent.DataKey::Balance(token)
 kind: storage
 title: DataKey::Balance(token) (persistent)
 path: demo/private-payroll/contracts/treasury/src/lib.rs
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/storage

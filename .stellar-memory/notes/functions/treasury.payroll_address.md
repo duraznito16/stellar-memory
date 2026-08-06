@@ -3,8 +3,8 @@ id: function:Treasury.payroll_address
 kind: function
 title: payroll_address
 path: demo/private-payroll/contracts/treasury/src/lib.rs
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/function

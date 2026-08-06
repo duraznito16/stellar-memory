@@ -76,11 +76,19 @@ test('every deployment cites the read that answered for it', () => {
   // command that will fail for them, which reads as the memory being wrong
   // about the contract rather than wrong about itself.
   //
-  // `contract info hash` is the legacy spelling: it is what produced the vault
-  // committed here, and the CLI has since dropped the subcommand entirely, so a
-  // vault regenerated against a network now cites `contract fetch` — which
-  // downloads the deployed binary and hashes it. Both are accepted; what is not
-  // is either of them appearing on a deployment whose Wasm was never read.
+  // Both spellings are accepted because both have produced vaults in the wild.
+  // `contract info hash` is what wrote the one committed here; a vault
+  // regenerated now cites `contract fetch`, which downloads the deployed binary
+  // so the same SHA-256 covers the local and remote halves through one path —
+  // and the local half then needs no CLI at all, which is what gives `--offline`
+  // a real hash for the first time.
+  //
+  // Not because the subcommand vanished: `stellar contract info hash` is alive
+  // in CLI 27.0.0 and returns the hash. Saying otherwise in a file that exists
+  // to stop unverified claims would be its own small joke.
+  //
+  // What is refused is either spelling appearing on a deployment whose Wasm was
+  // never read.
   const readsTheWasm = /contract (fetch|info hash)/;
   for (const node of deployments) {
     const command = node.provenance?.[0]?.command ?? '';

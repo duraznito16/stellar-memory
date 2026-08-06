@@ -4,8 +4,8 @@ kind: event
 title: paid
 path: demo/private-payroll/contracts/payroll/src/lib.rs
 summary: Published via `env.events().publish(...)`.
-first_seen: 2026-08-06T05:42:08.159Z
-last_changed: 2026-08-06T05:42:08.159Z
+first_seen: 2026-08-06T18:12:12.243Z
+last_changed: 2026-08-06T18:12:12.243Z
 tags:
   - stellar-memory
   - kind/event
