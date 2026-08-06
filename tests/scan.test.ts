@@ -14,6 +14,7 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { register } from 'node:module';
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
@@ -24,10 +25,17 @@ import { fileURLToPath } from 'node:url';
 // the `.js` specifiers the compiler emits, which type stripping leaves alone.
 register('./src-specifiers.mjs', import.meta.url);
 
-const { scanProject } = await import('../src/scanner/scan.ts');
+const { partitionAliases, scanProject } = await import('../src/scanner/scan.ts');
 type ProjectMemory = Awaited<ReturnType<typeof scanProject>>['memory'];
+type MemoryNode = ProjectMemory['nodes'][number];
 type MemoryEdge = ProjectMemory['edges'][number];
-type ContractData = { crate: string; functions: string[]; localWasmHash?: string };
+type AliasEntry = Parameters<typeof partitionAliases>[0][number];
+type ContractData = {
+  crate: string;
+  functions: string[];
+  wasmPath?: string;
+  localWasmHash?: string;
+};
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const demo = path.resolve(here, '..', 'demo', 'private-payroll');
@@ -470,6 +478,127 @@ impl EmployeeRegistry {
 });
 
 /* ------------------------------------------------------------------ *
+ * Drift, which needs both halves of a comparison
+ * ------------------------------------------------------------------ */
+
+test('the built Wasm in the tree is hashed with no CLI and no network', async () => {
+  // Half of drift detection is a file, and this half used to be read by
+  // `stellar contract info hash --wasm <file>` — a subcommand the CLI no longer
+  // has, called only inside the online branch. So it produced nothing when it
+  // ran and never ran when the developer was offline, and every contract in
+  // every vault went without a local hash: `drift` fell to `unknown` and
+  // `check --fail-on drift` exited 0 for want of anything to compare.
+  // The Wasm preamble, and then nothing that would survive a validator. What is
+  // hashed is bytes, so bytes are all the fixture needs to be.
+  const wasm = '\0asm\x01\x00\x00\x00 not really a build';
+  const root = await tree({
+    'Cargo.toml': WORKSPACE,
+    'contracts/treasury/Cargo.toml': manifest('treasury'),
+    'contracts/treasury/src/lib.rs': GENERATED_A,
+    'target/wasm32v1-none/release/treasury.wasm': wasm,
+  });
+
+  const { memory } = await scan(root); // offline, as every test here is
+  const contract = memory.nodes.find((n) => n.kind === 'contract');
+  const data = contract?.data as unknown as ContractData;
+
+  assert.equal(data.wasmPath, 'target/wasm32v1-none/release/treasury.wasm');
+  assert.equal(
+    data.localWasmHash,
+    createHash('sha256').update(Buffer.from(wasm, 'utf8')).digest('hex'),
+    'the hash of a contract is the hash of its bytes, and Node can read bytes',
+  );
+
+  // And it is cited to the file it was taken from. A `stellar-cli` citation
+  // would send a reader to a command that does not exist to check a number,
+  // which is how the whole thing stayed broken.
+  const cited = contract!.provenance.filter(
+    (p) => 'file' in p && p.file === 'target/wasm32v1-none/release/treasury.wasm',
+  );
+  assert.equal(cited.length, 1, 'the local hash names the artifact it came from');
+  assert.ok(
+    !contract!.provenance.some((p) => 'command' in p && /info hash/.test(p.command)),
+    'nothing may cite `contract info hash`; the CLI has no such subcommand',
+  );
+});
+
+/* ------------------------------------------------------------------ *
+ * Whose deployments are these
+ * ------------------------------------------------------------------ */
+
+test('a stranger in the machine-wide alias store is not a deployment of this project', async () => {
+  // Scanning the demo on a machine with its own Stellar work brought back seven
+  // deployments instead of four: `performance-oracle`, `strategy-vault` and
+  // `trade-audit-log` — real contracts, belonging to other projects, sitting in
+  // `~/.config/stellar/contract-ids` where the current CLI writes every alias.
+  // The memory then asserted that this project was live at addresses it has
+  // never touched, which is the one kind of mistake a tool premised on evidence
+  // cannot make.
+  const contracts = (
+    JSON.parse(
+      await fs.readFile(path.join(demo, '.stellar-memory', 'index.json'), 'utf8'),
+    ) as ProjectMemory
+  ).nodes.filter((n: MemoryNode) => n.kind === 'contract');
+  assert.equal(contracts.length, 3, 'the demo builds three contracts');
+
+  const alias = (name: string, source: AliasEntry['source']): AliasEntry => ({
+    alias: name,
+    contractId: 'CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R',
+    network: 'testnet',
+    source,
+  });
+
+  const { mine, foreign } = partitionAliases(
+    [
+      // What the demo's own `.stellar/contract-ids` holds.
+      alias('payroll', 'project'),
+      alias('treasury', 'project'),
+      alias('employee-registry', 'project'),
+      alias('pay-token', 'project'),
+      // What this machine's global store held.
+      alias('performance-oracle', 'global'),
+      alias('strategy-vault', 'global'),
+      alias('trade-audit-log', 'global'),
+      alias('hello_world', 'cli'),
+    ],
+    contracts,
+  );
+
+  assert.deepEqual(
+    mine.map((a) => a.alias).sort(),
+    ['employee-registry', 'pay-token', 'payroll', 'treasury'],
+    'the four the demo has, and `pay-token` in particular: a dependency this ' +
+      'workspace calls but does not build, which no name in the source matches',
+  );
+  assert.deepEqual(
+    foreign.map((a) => a.alias).sort(),
+    ['hello_world', 'performance-oracle', 'strategy-vault', 'trade-audit-log'],
+  );
+
+  // But the current CLI writes new aliases to the global store and calls local
+  // config deprecated, so excluding it wholesale would lose the developer their
+  // own deployment. A global alias that names something this workspace builds
+  // is theirs — under the crate name too, because `stellar contract init` calls
+  // every generated struct `Contract`.
+  const generated: MemoryNode[] = [
+    {
+      id: 'contract:Contract',
+      kind: 'contract',
+      title: 'Contract',
+      data: { crate: 'trade-audit-log', functions: [] },
+      provenance: [],
+      firstSeen: NOW,
+      lastChanged: NOW,
+    },
+  ];
+  assert.deepEqual(
+    partitionAliases([alias('trade-audit-log', 'global'), alias('strategy-vault', 'global')], generated)
+      .mine.map((a) => a.alias),
+    ['trade-audit-log'],
+  );
+});
+
+/* ------------------------------------------------------------------ *
  * What `--offline` is allowed to forget
  * ------------------------------------------------------------------ */
 
@@ -512,7 +641,7 @@ test('a source-only scan keeps the on-chain half it never looked at', async () =
     previous.nodes.filter(
       (n) => n.kind === 'contract' && (n.data as unknown as ContractData).localWasmHash,
     ).length,
-    'the local Wasm hash is read by the CLI too, and is not in the source either',
+    'the local Wasm hash is not in the source either, and a scan that did not look must keep it',
   );
 
   const changed = memory.scans[memory.scans.length - 1]?.changed ?? [];
@@ -521,11 +650,38 @@ test('a source-only scan keeps the on-chain half it never looked at', async () =
     [],
     'nothing about a deployment moved, so nothing about one is reported',
   );
-  assert.deepEqual(
-    changed.filter((id) => id.startsWith('contract:') || id.startsWith('error:')),
-    [],
-    'and a carried field does not make its node look edited',
-  );
+
+  // A carried field must not make its node look edited. The one thing an
+  // offline scan is now allowed to change about a contract is the hash of the
+  // artifact sitting in `target/` — that is read from the bytes on every scan,
+  // with no CLI and no network, so on a machine that has rebuilt the demo since
+  // the vault was committed it legitimately differs. `target/` is gitignored, so
+  // on a fresh clone there is nothing to read and this list is empty; where
+  // there is something to read, the new value has to be those exact bytes.
+  for (const id of changed) {
+    if (!id.startsWith('contract:') && !id.startsWith('error:')) continue;
+    const node = memory.nodes.find((n) => n.id === id)!;
+    const old = previous.nodes.find((n) => n.id === id)!;
+    // Through JSON, because `previous` came from the vault file and so carries
+    // no keys whose value was undefined, while a freshly built node does.
+    const withoutBuild = (data: Record<string, unknown> | undefined) =>
+      JSON.parse(JSON.stringify({ ...(data ?? {}), localWasmHash: undefined })) as unknown;
+    assert.deepEqual(
+      withoutBuild(node.data),
+      withoutBuild(old.data),
+      `${id} was reported as changed for something other than its local build`,
+    );
+
+    const wasmPath = (node.data as unknown as ContractData).wasmPath!;
+    const onDisk = createHash('sha256')
+      .update(await fs.readFile(path.join(demo, wasmPath)))
+      .digest('hex');
+    assert.equal(
+      (node.data as unknown as ContractData).localWasmHash,
+      onDisk,
+      `${id} reports a local hash that is not the hash of ${wasmPath}`,
+    );
+  }
 
   for (const node of after) {
     const old = before.find((n) => n.id === node.id)!;

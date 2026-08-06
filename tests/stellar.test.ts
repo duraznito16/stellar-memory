@@ -16,9 +16,12 @@
  * Against `src`, not `dist`: none of this needs a build to be true.
  */
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { existsSync, promises as fs } from 'node:fs';
 import { register } from 'node:module';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 register('./src-specifiers.mjs', import.meta.url);
@@ -26,6 +29,9 @@ register('./src-specifiers.mjs', import.meta.url);
 const {
   aliasDirectories,
   cliUnavailableWarning,
+  fetchOnChainWasmHash,
+  hashLocalWasm,
+  listAliases,
   probeStellarCli,
   resetCliProbe,
   runStellar,
@@ -133,6 +139,126 @@ test('the probe only ever asks for a version', async () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Wasm hashes, which are the whole of drift detection
+ * ------------------------------------------------------------------ */
+
+const temps: string[] = [];
+after(async () => {
+  for (const dir of temps) await fs.rm(dir, { recursive: true, force: true });
+});
+
+async function tempDir(): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellar-memory-cli-'));
+  temps.push(dir);
+  return dir;
+}
+
+test('the local half of a drift check is bytes on disk, not a CLI subcommand', async () => {
+  // It used to be `stellar contract info hash --wasm <file>`. That subcommand
+  // was removed — 23.2.1 offers interface, meta, env-meta and build, and
+  // nothing else — so the call had been failing and returning null for every
+  // contract, on every scan, without a word. A Soroban contract's identity is
+  // the SHA-256 of its Wasm bytes, so there is no reason to ask anyone: this now
+  // works with no CLI installed and no network in reach.
+  const dir = await tempDir();
+  const wasm = path.join(dir, 'treasury.wasm');
+  const bytes = Buffer.from('\0asm\x01\x00\x00\x00not really a module');
+  await fs.writeFile(wasm, bytes);
+
+  const { hash } = await hashLocalWasm(wasm);
+  assert.equal(hash, createHash('sha256').update(bytes).digest('hex'));
+
+  // And a missing artifact is a reason, not a shrug.
+  const absent = await hashLocalWasm(path.join(dir, 'never-built.wasm'));
+  assert.equal(absent.hash, null);
+  assert.match(absent.detail ?? '', /no built Wasm/);
+});
+
+test('the deployed half is fetched, hashed and cleaned up — and never asks for `info hash`', async () => {
+  const bytes = Buffer.from('\0asm\x01\x00\x00\x00deployed build');
+  const calls: string[][] = [];
+  let wrote = '';
+
+  // The CLI writes the binary; stand in for it exactly, so what is asserted is
+  // the shape of the real invocation and not a paraphrase of it.
+  const run = async (args: string[]): Promise<RunResult> => {
+    calls.push(args);
+    wrote = args[args.indexOf('--out-file') + 1] ?? '';
+    await fs.writeFile(wrote, bytes);
+    return { ok: true, stdout: '', stderr: '' };
+  };
+
+  const res = await fetchOnChainWasmHash(
+    { contractId: 'CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R', network: 'testnet' },
+    run,
+  );
+  assert.equal(res.hash, createHash('sha256').update(bytes).digest('hex'));
+  assert.equal(res.detail, undefined);
+
+  assert.deepEqual(calls[0]?.slice(0, 6), [
+    'contract',
+    'fetch',
+    '--id',
+    'CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R',
+    '--network',
+    'testnet',
+  ]);
+  assert.equal(calls[0]?.[6], '--out-file', 'a Wasm is large and binary; it goes to a file, not a pipe');
+  assert.ok(
+    !calls.some((args) => args.join(' ').includes('info hash')),
+    'nothing may call a subcommand the CLI does not have',
+  );
+  assert.ok(!existsSync(wrote), `the downloaded binary is temporary and was left behind at ${wrote}`);
+
+  // `contract fetch` reads. The boundary is that this bridge never writes to the
+  // network, and a hash check is exactly the kind of thing that gets "improved"
+  // into a redeploy.
+  for (const args of calls) {
+    assert.ok(
+      !/^(deploy|invoke|install|upgrade|restore|extend|send|sign)$/.test(args[1] ?? ''),
+      `read-only bridge issued \`stellar ${args.join(' ')}\``,
+    );
+  }
+});
+
+test('a hash that could not be read comes back with the reason it could not', async () => {
+  // Silence is the actual defect. `fetchWasmHash` returned null whether the
+  // contract was a Stellar Asset Contract with no code to download, the network
+  // was unreachable, or the subcommand did not exist — and the scan turned all
+  // three into `drift: "unknown"` with nothing printed, so a `check --fail-on
+  // drift` gate passed because nothing had been checked.
+  const sac = await fetchOnChainWasmHash({ contractId: 'CDLZ...', network: 'testnet' }, async () => ({
+    ok: false,
+    stdout: '',
+    stderr:
+      '❌ error: cannot fetch wasm for contract because the contract is a network built-in asset contract that does not have a downloadable code binary\n',
+  }));
+  assert.equal(sac.hash, null);
+  assert.match(sac.detail ?? '', /built-in asset contract/);
+  assert.doesNotMatch(sac.detail ?? '', /^❌/, 'the reason is for a human to read in a warning');
+
+  const timedOut = await fetchOnChainWasmHash({ contractId: 'CDLZ...' }, async () => ({
+    ok: false,
+    stdout: '',
+    stderr: '',
+    timedOut: true,
+  }));
+  assert.match(timedOut.detail ?? '', /no answer within/);
+
+  const missing = await fetchOnChainWasmHash({ contractId: 'CDLZ...' }, async () => ({
+    ok: false,
+    stdout: '',
+    stderr: '',
+    spawnError: 'stellar CLI not found on PATH',
+  }));
+  assert.match(missing.detail ?? '', /not found on PATH/);
+
+  // Nothing to ask about is also a reason, and asking anyway would have spawned
+  // a process to be told so.
+  assert.match((await fetchOnChainWasmHash({})).detail ?? '', /no contract id/);
+});
+
+/* ------------------------------------------------------------------ *
  * Spec parsing
  * ------------------------------------------------------------------ */
 
@@ -221,4 +347,41 @@ test('the project-local alias store is consulted before the global one', () => {
   const dirs = aliasDirectories(path.resolve('/project'));
   assert.equal(dirs.length, 2);
   assert.equal(dirs[0], path.join(path.resolve('/project'), '.stellar', 'contract-ids'));
+});
+
+test('an alias remembers which store it came out of', async () => {
+  // The global store is one list shared by every Stellar project on the
+  // machine, so an address in it says nothing about which project it belongs
+  // to. Without that distinction the scanner could not tell a dependency the
+  // project really uses from someone else's unrelated contract, and pulled
+  // three strangers into the demo's memory as its own deployments.
+  const home = await tempDir();
+  const project = await tempDir();
+  const passphrase = 'Test SDF Network ; September 2015';
+
+  const write = async (dir: string, alias: string, id: string) => {
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, `${alias}.json`), JSON.stringify({ ids: { [passphrase]: id } }));
+  };
+  const globalDir = path.join(home, 'stellar', 'contract-ids');
+  await write(globalDir, 'strategy-vault', 'CA6EEG6X36QTEOJVJ5KOU5UQR4ZUTG7HPZJ54SXNWQTPJMVTTCILAR4P');
+  await write(globalDir, 'treasury', 'CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R');
+  const projectDir = path.join(project, '.stellar', 'contract-ids');
+  await write(projectDir, 'pay-token', 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC');
+  // The same alias in both stores: the project knows where it lives, so the
+  // ambiguous copy must not overwrite it.
+  await write(projectDir, 'treasury', 'CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R');
+
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = home;
+  try {
+    const aliases = await listAliases('testnet', project);
+    const by = (name: string) => aliases.find((a) => a.alias === name);
+    assert.equal(by('pay-token')?.source, 'project');
+    assert.equal(by('strategy-vault')?.source, 'global');
+    assert.equal(by('treasury')?.source, 'project');
+  } finally {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+  }
 });

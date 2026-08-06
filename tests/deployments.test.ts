@@ -22,7 +22,7 @@ interface Node {
   kind: string;
   title: string;
   summary?: string;
-  data?: { network?: string; contractId?: string; drift?: string };
+  data?: { network?: string; contractId?: string; drift?: string; onChainWasmHash?: string };
   provenance?: { command?: string; network?: string }[];
 }
 
@@ -72,21 +72,28 @@ test('no deployment claims a network the aliases never name', () => {
 });
 
 test('every deployment cites the read that answered for it', () => {
-  // Citing `info hash` when only the interface came back sends a reader to a
+  // Citing the Wasm read when only the interface came back sends a reader to a
   // command that will fail for them, which reads as the memory being wrong
   // about the contract rather than wrong about itself.
+  //
+  // `contract info hash` is the legacy spelling: it is what produced the vault
+  // committed here, and the CLI has since dropped the subcommand entirely, so a
+  // vault regenerated against a network now cites `contract fetch` — which
+  // downloads the deployed binary and hashes it. Both are accepted; what is not
+  // is either of them appearing on a deployment whose Wasm was never read.
+  const readsTheWasm = /contract (fetch|info hash)/;
   for (const node of deployments) {
     const command = node.provenance?.[0]?.command ?? '';
     assert.match(
       command,
-      /contract info (hash|meta|interface)/,
+      /contract (fetch|info (hash|meta|interface))/,
       `${node.title} should cite the specific read it got an answer from, got "${command}"`,
     );
-    if (node.data?.drift === 'unknown') {
+    if (!node.data?.onChainWasmHash) {
       assert.doesNotMatch(
         command,
-        /contract info hash/,
-        `${node.title} has no on-chain hash, so it must not cite \`info hash\` as its source`,
+        readsTheWasm,
+        `${node.title} carries no on-chain Wasm hash, so nothing fetched its Wasm — it must not cite the command that would have`,
       );
     }
   }
