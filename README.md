@@ -468,28 +468,30 @@ machine.
 
 ```
 src/
-  scanner/     rust.ts     1144   Soroban source analysis — the hard part
-               scan.ts     1210   graph construction and correlation
+  scanner/     rust.ts     1302   Soroban source analysis — the hard part
+               scan.ts     1296   graph construction and correlation
                cargo.ts     126   workspace parsing
                walk.ts      106   gitignore-aware file walk
-  core/        query.ts     685   signals, search, resume, neighbourhoods
+  core/        query.ts     731   signals, search, resume, neighbourhoods
                types.ts     247   the graph model
-               git.ts       118   HEAD, last commit, dates
+               git.ts       121   HEAD, last commit, dates
   stellar/     cli.ts       266   read-only Stellar CLI bridge
                spec.ts      140   SCSpecEntry → functions, errors, events
-  store/       html.ts      915   the self-contained page and the live page
-               render.ts    380   Markdown notes
-               vault.ts     215   read/write .stellar-memory/
+  store/       html.ts     1300   the self-contained page and the live page
+               render.ts    384   Markdown notes
+               vault.ts     269   read/write .stellar-memory/
   ui/          serve.ts     353   loopback HTTP + SSE hub + shutdown
                watch.ts     249   debounced, non-overlapping watchers
                open.ts      242   cross-platform window launcher
-  commands/    mcp.ts       794   the 8 agent-facing tools
+  commands/    mcp.ts       802   the 8 agent-facing tools
                ui.ts        206   wiring for the live window
-               graph.ts     200   tree, mermaid, dot, json, html
+               graph.ts     229   tree, mermaid, dot, json, html
 ```
 
-`rust.ts` and `scan.ts` are 40% of the codebase because the claim this tool makes
-is that its facts are true. Everything else reads what they produce.
+`rust.ts` and `scan.ts` are a quarter of the codebase, and the largest thing in
+it after them is the page they end up drawn on. That weighting is the point:
+the claim this tool makes is that its facts are true, and everything else reads
+what those two produce.
 
 ## The committable artifact
 

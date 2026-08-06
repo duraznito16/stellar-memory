@@ -3,50 +3,86 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <title>private-payroll — project memory</title>
 <style>
   :root {
     color-scheme: light;
+    --plane: #f1f1ee;
     --surface-1: #fcfcfb;
-    --plane: #f9f9f7;
+    --sunken: #f7f7f4;
     --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --muted: #898781;
+    --text-secondary: #4c4b48;
+    --muted: #6f6e69;
     --hairline: #e1e0d9;
-    --border: rgba(11,11,11,0.10);
+    /* The relationship lines, and only those. They carry `defines`, `reads`
+       and `tests` — most of the picture — and at the hairline value they were
+       drawn in they measure about 1.25:1 against the canvas: recessive on a
+       laptop, absent on a projector, and gone entirely in a printed copy. This
+       measures 2.1:1 light and 2.05:1 dark. Recessive is the intent; invisible
+       is not, and it was not only the projected page that suffered from it. */
+    --edge: #b3b1a6;
+    --border: rgba(11,11,11,0.13);
+    --lift: 0 1px 1px rgba(11,11,11,0.04), 0 4px 14px rgba(11,11,11,0.05);
     --contract: #2a78d6;
     --onchain: #eb6834;
     --storage: #1baf7a;
     --other: #898781;
-    --status-warning: #fab219;
-    --status-critical: #d03b3b;
+    /* Reserved, fixed, and the only accent on the page that means anything. */
+    --attn: #d03b3b;
+    /* The same red, stepped for text. The mark step is the reserved status
+       colour and stays put in both modes; against the dark surface it measures
+       3.62:1, which is a mark and is not a label, so red *words* take the
+       palette's dark red step instead and clear 5.39:1. Light needs no second
+       step — the mark colour is already 4.68:1 there. */
+    --attn-text: #d03b3b;
+    --attn-wash: rgba(208,59,59,0.055);
+    --attn-edge: rgba(208,59,59,0.30);
+    --clear: #006300;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface-1: #1a1a19;
-      --plane: #0d0d0d;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --muted: #898781;
-      --hairline: #2c2c2a;
-      --border: rgba(255,255,255,0.10);
-      --contract: #3987e5;
-      --onchain: #d95926;
-      --storage: #199e70;
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface-1: #1a1a19;
+    --sunken: #121211;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #9a988f;
+    --hairline: #2c2c2a;
+    --edge: #4d4d48;
+    --border: rgba(255,255,255,0.14);
+    --lift: none;
+    --contract: #3987e5;
+    --onchain: #d95926;
+    --storage: #199e70;
+    --other: #898781;
+    --attn-text: #e66767;
+    --attn-wash: rgba(208,59,59,0.14);
+    --attn-edge: rgba(208,59,59,0.42);
+    --clear: #0ca30c;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface-1: #1a1a19;
     --plane: #0d0d0d;
+    --surface-1: #1a1a19;
+    --sunken: #121211;
     --text-primary: #ffffff;
     --text-secondary: #c3c2b7;
+    --muted: #9a988f;
     --hairline: #2c2c2a;
-    --border: rgba(255,255,255,0.10);
+    --edge: #4d4d48;
+    --border: rgba(255,255,255,0.14);
+    --lift: none;
     --contract: #3987e5;
     --onchain: #d95926;
     --storage: #199e70;
+    --other: #898781;
+    --attn-text: #e66767;
+    --attn-wash: rgba(208,59,59,0.14);
+    --attn-edge: rgba(208,59,59,0.42);
+    --clear: #0ca30c;
   }
 
   * { box-sizing: border-box; }
@@ -55,35 +91,83 @@
     background: var(--plane);
     color: var(--text-primary);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
   }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 20px 64px; }
-  header { margin-bottom: 22px; }
-  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .purpose { color: var(--text-secondary); margin: 0 0 16px; max-width: 70ch; }
-  .stats { display: flex; flex-wrap: wrap; gap: 26px; margin-bottom: 4px; }
-  .stat b { display: block; font-size: 22px; line-height: 1.2; }
-  .stat span { color: var(--muted); font-size: 13px; }
-  .stat--warn b { color: var(--status-critical); }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 30px 22px 60px; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0 10px; font-size: 13px; color: var(--text-secondary); }
+  /* Every symbol on the page is one of four paths at one of three sizes, and
+     takes the colour of whatever it sits in. */
+  .ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -2px; fill: currentColor; }
+
+  /* ---- who this is, and the one number that is not inventory ---------- */
+
+  header { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 24px; align-items: start; margin-bottom: 20px; }
+  .ident { grid-column: 1; grid-row: 1; min-width: 0; }
+  h1 { font-size: 27px; font-weight: 650; margin: 0; letter-spacing: -0.02em; }
+  .purpose { color: var(--text-secondary); margin: 6px 0 0; max-width: 80ch; font-size: 14.5px; }
+
+  /* Three counts describe the picture and one describes the state of the
+     project. Keeping them the same size was the old page's way of saying they
+     were equally interesting, which they are not: the fourth is the reason
+     anybody opened the file. It gets the size, the accent and the symbol; the
+     other three stay quiet enough to read as context. */
+  .stats { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 22px; margin-top: 16px; }
+  .stat b { display: block; font-size: 19px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .stat span { display: block; color: var(--text-secondary); font-size: 12.5px; }
+  .stat--warn { padding-left: 22px; border-left: 1px solid var(--border); }
+  .stat--warn b { color: var(--attn-text); font-size: 27px; }
+  .stat--warn span { display: flex; align-items: center; gap: 5px; font-weight: 600; color: var(--text-primary); }
+  .stat--warn .ic { color: var(--attn); width: 14px; height: 14px; }
+  /* Nothing to report is not an alarm. The accent is reserved for a number
+     somebody has to do something about, and zero is not one. */
+  .stat--none b, .stat--none .ic { color: var(--clear); }
+
+  .theme {
+    grid-column: 2; grid-row: 1; justify-self: end;
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font: inherit; font-size: 12.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px;
+  }
+  .theme:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .theme .ic { width: 14px; height: 14px; }
+
+  .no-js { margin: 0 0 16px; font-size: 13.5px; color: var(--text-secondary); }
+
+  /* ---- the figure ------------------------------------------------------ */
+
+  .board { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .board { grid-template-columns: 1fr; } }
+  .figure { min-width: 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 0 0 11px; font-size: 13px; color: var(--text-secondary); }
   .legend-item { display: flex; align-items: center; gap: 7px; }
-  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .swatch { width: 13px; height: 13px; border-radius: 50%; flex: none; }
   .swatch--square { border-radius: 2px; }
   .swatch--diamond { border-radius: 2px; transform: rotate(45deg); }
-  .swatch--ring { background: none; border: 2px dashed var(--status-critical); }
+  .legend .ic { width: 15px; height: 15px; color: var(--attn); }
 
-  .board { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 18px; align-items: start; }
-  @media (max-width: 940px) { .board { grid-template-columns: 1fr; } }
+  /* The drawing admitting what it left out. Neutral rather than red: it is not
+     a finding, and a page that shouts twice is a page nobody believes twice. */
+  .notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin: 0 0 12px; padding: 10px 13px;
+    background: var(--sunken); border: 1px solid var(--border);
+    border-left: 3px solid var(--text-secondary); border-radius: 7px;
+  }
+  .notice .ic { color: var(--text-secondary); margin-top: 2px; }
+  .trimmed { margin: 0; color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; max-width: 96ch; }
 
   .canvas {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow-x: auto;
+    box-shadow: var(--lift);
   }
-  svg { display: block; width: 100%; height: auto; }
+  .canvas > svg { display: block; width: 100%; height: auto; }
 
-  .edge { stroke: var(--hairline); stroke-width: 1.25; }
+  .edge { stroke: var(--edge); stroke-width: 1.25; }
   .edge--calls { stroke: var(--contract); stroke-width: 2; stroke-opacity: 0.55; }
   .edge--deployed_as { stroke: var(--onchain); stroke-width: 2; stroke-dasharray: 4 3; }
   .edge--writes { stroke: var(--storage); stroke-width: 1.75; }
@@ -99,20 +183,23 @@
   .node:focus { outline: none; }
   .node.is-selected > rect, .node.is-selected > circle, .node.is-selected > path { stroke: var(--text-primary); stroke-width: 3; }
 
-  .ring { fill: none; stroke-width: 3; stroke-dasharray: 3 2.5; }
-  .ring--warn { stroke: var(--status-critical); }
+  /* Selected by element AND class, deliberately.
+     `.ring` alone loses to `.node--other > circle` — one class against one class
+     and a type — so for two of the four groups the finding ring was being filled
+     with the group's own colour and stroked in the surface colour, and for the
+     other two it was a surface-coloured circle on a surface-coloured canvas:
+     invisible. The legend promised a red dashed ring the drawing never drew. */
+  .node > circle.ring-gap { fill: none; stroke: var(--surface-1); stroke-width: 5; }
+  .node > circle.ring { fill: none; stroke: var(--attn); stroke-width: 2.5; stroke-dasharray: 3.5 2.75; }
 
-  .flag {
-    font: 700 13px system-ui, sans-serif;
-    fill: var(--status-critical);
-    paint-order: stroke;
-    stroke: var(--surface-1);
-    stroke-width: 3;
-    pointer-events: none;
-  }
+  /* paint-order puts the surface stroke behind the fill, which both lifts the
+     triangle off whatever it overlaps and fills the exclamation — a hole in the
+     path rather than a mark on top of it — with the canvas colour. */
+  .flag { pointer-events: none; }
+  .flag > path { fill: var(--attn); paint-order: stroke; stroke: var(--surface-1); stroke-width: 2.2; stroke-linejoin: round; }
 
   .node-label {
-    font: 600 12px system-ui, sans-serif;
+    font: 600 12px system-ui, -apple-system, "Segoe UI", sans-serif;
     fill: var(--text-primary);
     text-anchor: middle;
     paint-order: stroke;
@@ -122,154 +209,275 @@
   }
   .node-label--onchain { font-weight: 500; font-size: 11px; fill: var(--text-secondary); }
 
-  .panel {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 18px;
-    position: sticky;
-    top: 18px;
-  }
-  .panel h2 { font-size: 15px; margin: 0 0 2px; }
-  .panel .kind { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .panel .path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; margin: 8px 0; }
-  .panel p { color: var(--text-secondary); font-size: 13px; }
-  .finding { border-left: 3px solid var(--status-warning); padding: 6px 0 6px 10px; margin: 10px 0; font-size: 13px; }
-  .finding .tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-right: 6px; }
-  .rel { font-size: 13px; display: flex; gap: 8px; padding: 2px 0; }
-  .rel code { font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); min-width: 84px; }
+  /* Past a certain count the drawing is a texture, and everything in it is
+     equally loud. Nothing is hidden — the structure a reader came for is the
+     contracts, what is deployed and what is stored, so the functions, events and
+     tests that make up the bulk step back and let it through. The marks that
+     carry a finding keep their full weight, which is the point of thinning the
+     rest. */
+  .is-dense .edge { stroke-width: 1; stroke-opacity: 0.55; }
+  .is-dense .edge--calls { stroke-width: 1.5; stroke-opacity: 0.45; }
+  .is-dense .node--other > circle { opacity: 0.45; }
+  .is-dense .node--storage > rect { opacity: 0.8; }
+  .is-dense .node.is-near > circle, .is-dense .node.is-near > rect { opacity: 1; }
+  .is-dense .node--flagged > circle, .is-dense .node--flagged > rect, .is-dense .node--flagged > path { opacity: 1; }
 
-  details { margin-top: 24px; }
-  summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; }
-  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--hairline); }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-  footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+  /* Selecting a node dims everything that is not next to it, rather than hiding
+     it: the reader keeps the sense of how big the rest of the system is, and the
+     four or five names that appear are the ones the story is about. */
+  .node-label--near { font-weight: 500; font-size: 11px; display: none; }
+  svg.is-focused .node:not(.is-near) { opacity: 0.14; }
+  svg.is-focused .edge:not(.is-near) { opacity: 0.08; }
+  svg.is-focused .edge.is-near { stroke-opacity: 1; stroke-width: 2.75; }
+  svg.is-focused .edge.is-near:not(.edge--calls):not(.edge--writes):not(.edge--deployed_as) {
+    stroke: var(--text-secondary);
+  }
+  .node.is-near > .node-label--near { display: block; }
+
+  .side { min-width: 0; position: sticky; top: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* ---- what the page is for -------------------------------------------- */
+
+  .findings { min-width: 0; }
+  .findings h2 { display: flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; }
+  /* Plain ink: it counts the findings, not the warnings. The red number lives
+     in the header and answers the other question. */
+  .findings .count {
+    font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--text-secondary); background: var(--hairline);
+    border-radius: 999px; padding: 1px 9px;
+  }
+
+  /* Severity, said in words and in a fixed order, before any colour is
+     involved. A heading survives a projector, a greyscale print and a reader
+     who cannot separate red from grey. */
+  .grade {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-secondary); margin: 16px 0 8px;
+  }
+  .grade::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+  .grade--warn { color: var(--attn-text); }
+
+  .finding-list { list-style: none; margin: 0; padding: 0; }
+  .finding-list li + li { margin-top: 7px; }
+
+  .finding {
+    display: flex; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; color: var(--text-primary);
+    background: var(--surface-1);
+    border: 1px solid var(--border); border-left: 3px solid var(--muted);
+    border-radius: 7px; padding: 10px 11px;
+  }
+  /* Fill, rule weight and rule pattern all move with severity, so the two
+     states are still two states in greyscale. */
+  .finding--warn { background: var(--attn-wash); border-color: var(--attn-edge); border-left-color: var(--attn); }
+  .finding--info { border-left-style: dotted; }
+  .finding .sev { flex: none; line-height: 0; }
+  .finding .sev .ic { width: 17px; height: 17px; margin-top: 2px; }
+  .finding--warn .sev { color: var(--attn); }
+  .finding--info .sev { color: var(--muted); }
+  .finding .said { min-width: 0; }
+  .finding .tag { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-secondary); }
+  .finding .msg { display: block; font-size: 14px; line-height: 1.42; margin-top: 2px; }
+  .finding--warn .msg { font-weight: 500; }
+  .finding .where { display: block; margin-top: 6px; font: 11.5px/1.35 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); word-break: break-all; }
+  .finding:hover { border-color: var(--text-secondary); }
+  .finding:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+  .finding.is-active { border-color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--text-primary); }
+
+  /* Shown only when it is true, and it says what was checked — "no findings"
+     and "nothing was looked for" are not the same sentence. */
+  .all-clear {
+    display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0;
+    font-size: 13.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-left: 3px solid var(--clear); border-radius: 7px; padding: 11px 12px;
+  }
+  .all-clear .ic { color: var(--clear); width: 17px; height: 17px; margin-top: 1px; }
+
+  /* ---- the element under the cursor ------------------------------------ */
+
+  .detail {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; box-shadow: var(--lift);
+  }
+  .detail h2 { font-size: 15.5px; margin: 0 0 2px; }
+  .detail .kind { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .detail .path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; margin: 8px 0; }
+  .detail p { color: var(--text-secondary); font-size: 13.5px; margin: 6px 0; }
+  .detail .finding { cursor: default; margin: 8px 0 0; }
+  .rel { font-size: 13px; display: flex; gap: 9px; padding: 3px 0; }
+  .rel code { font: 11.5px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); min-width: 86px; }
+
+  /* ---- everything, for the reader who wants everything ------------------ */
+
+  details { margin-top: 26px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: 600; padding: 6px 0; }
+  summary:hover { color: var(--text-primary); }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--hairline); }
+  th { color: var(--text-secondary); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; }
+  .col-kind { color: var(--text-secondary); }
+  .col-path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; }
+  .col-state { color: var(--attn-text); font-weight: 600; white-space: nowrap; }
+  .col-state .ic { width: 14px; height: 14px; margin-right: 5px; }
+  footer { margin-top: 30px; color: var(--muted); font-size: 12px; }
+
+  /* A page that gets attached to a pull request gets printed as often as it
+     gets opened. Cards keep their edges, the accent survives greyscale as a
+     rule and a triangle, and nothing breaks across a page mid-finding. */
+  @media print {
+    :root { --plane: #fff; --surface-1: #fff; --sunken: #fff; --border: rgba(0,0,0,0.3); --lift: none; }
+    body { background: #fff; }
+    .theme, .no-js { display: none; }
+    .board { display: block; }
+    .side { position: static; margin-top: 20px; }
+    .finding, .notice, .all-clear, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>private-payroll</h1>
-    <p class="purpose">Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.</p>
+    <div class="ident">
+      <h1>private-payroll</h1>
+      <p class="purpose">Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.</p>
+    </div>
+    <button type="button" class="theme" aria-label="Switch between the light and dark palette"><svg class="ic ic--theme" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.35" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 1.65a6.35 6.35 0 0 1 0 12.7z" /></svg><span class="theme-label">Theme</span></button>
     <div class="stats">
       <div class="stat"><b>3</b><span>contracts</span></div>
-      <div class="stat"><b>36</b><span>elements</span></div>
-      <div class="stat"><b>58</b><span>relationships</span></div>
-      <div class="stat stat--warn"><b>6</b><span>need attention</span></div>
+      <div class="stat"><b>40</b><span>elements</span></div>
+      <div class="stat"><b>61</b><span>relationships</span></div>
+      <div class="stat stat--warn"><b>7</b><span><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>need attention</span></div>
     </div>
   </header>
 
-  <div class="legend" role="list">
-    <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--contract)"></span> Contract</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--diamond" style="background: var(--onchain)"></span> On-chain</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--square" style="background: var(--storage)"></span> Storage key</span>
-    <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--other)"></span> Function, event, error, test</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--ring"></span> ⚠ Has a finding</span>
-  </div>
+  <noscript><p class="no-js">Scripting is off, so the drawing will not respond to a click. Everything it would have told you is already written out: the findings beside it, and every element in the table below.</p></noscript>
 
   <div class="board">
-    <div class="canvas">
-      <svg viewBox="0 0 1100 720" role="list" aria-label="Project graph">
-        <g class="edges"><line class="edge edge--defines" x1="623.74" y1="600.8" x2="813.47" y2="629.86"><title>EmployeeRegistry defines initialize</title></line>
-<line class="edge edge--writes" x1="813.47" y1="629.86" x2="958.97" y2="698"><title>initialize writes DataKey::Admin (instance)</title></line>
-<line class="edge edge--defines" x1="623.74" y1="600.8" x2="898.59" y2="640.19"><title>EmployeeRegistry defines set_salary</title></line>
-<line class="edge edge--reads" x1="898.59" y1="640.19" x2="958.97" y2="698"><title>set_salary reads DataKey::Admin (instance)</title></line>
-<line class="edge edge--writes" x1="898.59" y1="640.19" x2="893.82" y2="698"><title>set_salary writes DataKey::Salary(employee) (persistent)</title></line>
-<line class="edge edge--emits" x1="898.59" y1="640.19" x2="1080" y2="700"><title>set_salary emits salary_set</title></line>
-<line class="edge edge--defines" x1="623.74" y1="600.8" x2="813.88" y2="700"><title>EmployeeRegistry defines remove</title></line>
-<line class="edge edge--reads" x1="813.88" y1="700" x2="958.97" y2="698"><title>remove reads DataKey::Admin (instance)</title></line>
-<line class="edge edge--writes" x1="813.88" y1="700" x2="893.82" y2="698"><title>remove writes DataKey::Salary(employee) (persistent)</title></line>
-<line class="edge edge--defines" x1="623.74" y1="600.8" x2="743.03" y2="700"><title>EmployeeRegistry defines salary_of</title></line>
-<line class="edge edge--reads" x1="743.03" y1="700" x2="893.82" y2="698"><title>salary_of reads DataKey::Salary(employee) (persistent)</title></line>
-<line class="edge edge--defines" x1="368.34" y1="480.15" x2="275.6" y2="635.01"><title>Payroll defines initialize</title></line>
-<line class="edge edge--writes" x1="275.6" y1="635.01" x2="372.59" y2="698"><title>initialize writes DataKey::Admin (instance)</title></line>
-<line class="edge edge--writes" x1="275.6" y1="635.01" x2="211.88" y2="698"><title>initialize writes DataKey::Treasury (instance)</title></line>
-<line class="edge edge--writes" x1="275.6" y1="635.01" x2="299.33" y2="698"><title>initialize writes DataKey::Registry (instance)</title></line>
-<line class="edge edge--writes" x1="275.6" y1="635.01" x2="179.16" y2="559.53"><title>initialize writes DataKey::PayToken (instance)</title></line>
-<line class="edge edge--defines" x1="368.34" y1="480.15" x2="325.49" y2="564.03"><title>Payroll defines pay</title></line>
-<line class="edge edge--reads" x1="325.49" y1="564.03" x2="372.59" y2="698"><title>pay reads DataKey::Admin (instance)</title></line>
-<line class="edge edge--reads" x1="325.49" y1="564.03" x2="299.33" y2="698"><title>pay reads DataKey::Registry (instance)</title></line>
-<line class="edge edge--reads" x1="325.49" y1="564.03" x2="211.88" y2="698"><title>pay reads DataKey::Treasury (instance)</title></line>
-<line class="edge edge--reads" x1="325.49" y1="564.03" x2="179.16" y2="559.53"><title>pay reads DataKey::PayToken (instance)</title></line>
-<line class="edge edge--writes" x1="325.49" y1="564.03" x2="100" y2="601.07"><title>pay writes DataKey::LastPaid(employee) (persistent)</title></line>
-<line class="edge edge--raises" x1="325.49" y1="564.03" x2="223.93" y2="458.35"><title>pay raises PayrollError</title></line>
-<line class="edge edge--emits" x1="325.49" y1="564.03" x2="133" y2="700"><title>pay emits paid</title></line>
-<line class="edge edge--defines" x1="368.34" y1="480.15" x2="143.56" y2="409.83"><title>Payroll defines set_pay_token</title></line>
-<line class="edge edge--writes" x1="143.56" y1="409.83" x2="179.16" y2="559.53"><title>set_pay_token writes DataKey::PayToken (instance)</title></line>
-<line class="edge edge--emits" x1="143.56" y1="409.83" x2="20" y2="313.29"><title>set_pay_token emits token_changed</title></line>
-<line class="edge edge--defines" x1="368.34" y1="480.15" x2="140.64" y2="501.78"><title>Payroll defines last_paid</title></line>
-<line class="edge edge--reads" x1="140.64" y1="501.78" x2="100" y2="601.07"><title>last_paid reads DataKey::LastPaid(employee) (persistent)</title></line>
-<line class="edge edge--defines" x1="488.89" y1="273.17" x2="388.87" y2="98.7"><title>Treasury defines initialize</title></line>
-<line class="edge edge--writes" x1="388.87" y1="98.7" x2="359.02" y2="22"><title>initialize writes DataKey::Admin (instance)</title></line>
-<line class="edge edge--writes" x1="388.87" y1="98.7" x2="506" y2="22"><title>initialize writes DataKey::Payroll (instance)</title></line>
-<line class="edge edge--defines" x1="488.89" y1="273.17" x2="548.21" y2="56.44"><title>Treasury defines fund</title></line>
-<line class="edge edge--reads" x1="548.21" y1="56.44" x2="359.02" y2="22"><title>fund reads DataKey::Admin (instance)</title></line>
-<line class="edge edge--reads" x1="548.21" y1="56.44" x2="597.66" y2="22"><title>fund reads DataKey::Balance(token) (persistent)</title></line>
-<line class="edge edge--writes" x1="548.21" y1="56.44" x2="597.66" y2="22"><title>fund writes DataKey::Balance(token) (persistent)</title></line>
-<line class="edge edge--raises" x1="548.21" y1="56.44" x2="655.27" y2="20"><title>fund raises TreasuryError</title></line>
-<line class="edge edge--emits" x1="548.21" y1="56.44" x2="734.27" y2="20"><title>fund emits funded</title></line>
-<line class="edge edge--defines" x1="488.89" y1="273.17" x2="687.28" y2="81.7"><title>Treasury defines withdraw</title></line>
-<line class="edge edge--reads" x1="687.28" y1="81.7" x2="506" y2="22"><title>withdraw reads DataKey::Payroll (instance)</title></line>
-<line class="edge edge--reads" x1="687.28" y1="81.7" x2="597.66" y2="22"><title>withdraw reads DataKey::Balance(token) (persistent)</title></line>
-<line class="edge edge--writes" x1="687.28" y1="81.7" x2="597.66" y2="22"><title>withdraw writes DataKey::Balance(token) (persistent)</title></line>
-<line class="edge edge--raises" x1="687.28" y1="81.7" x2="655.27" y2="20"><title>withdraw raises TreasuryError</title></line>
-<line class="edge edge--calls" x1="687.28" y1="81.7" x2="907.87" y2="37"><title>withdraw calls Token (token)</title></line>
-<line class="edge edge--emits" x1="687.28" y1="81.7" x2="850.55" y2="20"><title>withdraw emits withdrawn</title></line>
-<line class="edge edge--defines" x1="488.89" y1="273.17" x2="479.82" y2="120.14"><title>Treasury defines balance</title></line>
-<line class="edge edge--reads" x1="479.82" y1="120.14" x2="597.66" y2="22"><title>balance reads DataKey::Balance(token) (persistent)</title></line>
-<line class="edge edge--defines" x1="488.89" y1="273.17" x2="572.33" y2="126.74"><title>Treasury defines payroll_address</title></line>
-<line class="edge edge--reads" x1="572.33" y1="126.74" x2="506" y2="22"><title>payroll_address reads DataKey::Payroll (instance)</title></line>
-<line class="edge edge--raises" x1="572.33" y1="126.74" x2="655.27" y2="20"><title>payroll_address raises TreasuryError</title></line>
-<line class="edge edge--calls" x1="368.34" y1="480.15" x2="623.74" y2="600.8"><title>Payroll calls EmployeeRegistry</title></line>
-<line class="edge edge--calls" x1="368.34" y1="480.15" x2="488.89" y2="273.17"><title>Payroll calls Treasury</title></line>
-<line class="edge edge--calls" x1="325.49" y1="564.03" x2="623.74" y2="600.8"><title>pay calls EmployeeRegistry</title></line>
-<line class="edge edge--calls" x1="325.49" y1="564.03" x2="488.89" y2="273.17"><title>pay calls Treasury</title></line>
-<line class="edge edge--tests" x1="519.19" y1="457.92" x2="623.74" y2="600.8"><title>payroll/test.rs tests EmployeeRegistry</title></line>
-<line class="edge edge--tests" x1="519.19" y1="457.92" x2="368.34" y2="480.15"><title>payroll/test.rs tests Payroll</title></line>
-<line class="edge edge--tests" x1="519.19" y1="457.92" x2="488.89" y2="273.17"><title>payroll/test.rs tests Treasury</title></line>
-<line class="edge edge--tests" x1="639.38" y1="296.25" x2="488.89" y2="273.17"><title>treasury/test.rs tests Treasury</title></line></g>
-        <g class="nodes"><g class="node node--contract" tabindex="0" role="listitem" data-id="contract:EmployeeRegistry" aria-label="EmployeeRegistry, contract"><circle class="ring ring--warn" cx="623.74" cy="600.8" r="20" /><text class="flag" x="643.74" y="582.8">!</text><circle cx="623.74" cy="600.8" r="15" /><text class="node-label node-label--contract" x="623.74" y="630.8">EmployeeRegistry</text><title>EmployeeRegistry (contract)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.initialize" aria-label="initialize, function"><circle class="ring ring--warn" cx="813.47" cy="629.86" r="11" /><text class="flag" x="824.47" y="620.86">!</text><circle cx="813.47" cy="629.86" r="6" /><title>initialize (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:EmployeeRegistry.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="950.97" y="690" width="16" height="16" rx="2" /><title>DataKey::Admin (instance) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.set_salary" aria-label="set_salary, function"><circle cx="898.59" cy="640.19" r="6" /><title>set_salary (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:EmployeeRegistry.persistent.DataKey::Salary(employee)" aria-label="DataKey::Salary(employee) (persistent), storage"><rect x="885.82" y="690" width="16" height="16" rx="2" /><title>DataKey::Salary(employee) (persistent) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="event:EmployeeRegistry.salary_set" aria-label="salary_set, event"><circle cx="1080" cy="700" r="6" /><title>salary_set (event)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.remove" aria-label="remove, function"><circle cx="813.88" cy="700" r="6" /><title>remove (function)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.salary_of" aria-label="salary_of, function"><circle cx="743.03" cy="700" r="6" /><title>salary_of (function)</title></g>
-<g class="node node--contract" tabindex="0" role="listitem" data-id="contract:Payroll" aria-label="Payroll, contract"><circle cx="368.34" cy="480.15" r="15" /><text class="node-label node-label--contract" x="368.34" y="510.15">Payroll</text><title>Payroll (contract)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.initialize" aria-label="initialize, function"><circle class="ring ring--warn" cx="275.6" cy="635.01" r="11" /><text class="flag" x="286.6" y="626.01">!</text><circle cx="275.6" cy="635.01" r="6" /><title>initialize (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="364.59" y="690" width="16" height="16" rx="2" /><title>DataKey::Admin (instance) (storage)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Treasury" aria-label="DataKey::Treasury (instance), storage"><rect x="203.88" y="690" width="16" height="16" rx="2" /><title>DataKey::Treasury (instance) (storage)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Registry" aria-label="DataKey::Registry (instance), storage"><rect x="291.33" y="690" width="16" height="16" rx="2" /><title>DataKey::Registry (instance) (storage)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::PayToken" aria-label="DataKey::PayToken (instance), storage"><rect x="171.16" y="551.53" width="16" height="16" rx="2" /><title>DataKey::PayToken (instance) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.pay" aria-label="pay, function"><circle cx="325.49" cy="564.03" r="6" /><title>pay (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.persistent.DataKey::LastPaid(employee)" aria-label="DataKey::LastPaid(employee) (persistent), storage"><circle class="ring ring--warn" cx="100" cy="601.07" r="13" /><text class="flag" x="113" y="590.07">!</text><rect x="92" y="593.07" width="16" height="16" rx="2" /><title>DataKey::LastPaid(employee) (persistent) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="event:Payroll.paid" aria-label="paid, event"><circle cx="133" cy="700" r="6" /><title>paid (event)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.set_pay_token" aria-label="set_pay_token, function"><circle class="ring ring--warn" cx="143.56" cy="409.83" r="11" /><text class="flag" x="154.56" y="400.83">!</text><circle cx="143.56" cy="409.83" r="6" /><title>set_pay_token (function)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="event:Payroll.token_changed" aria-label="token_changed, event"><circle cx="20" cy="313.29" r="6" /><title>token_changed (event)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.last_paid" aria-label="last_paid, function"><circle cx="140.64" cy="501.78" r="6" /><title>last_paid (function)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="error:payroll.PayrollError" aria-label="PayrollError, error"><circle cx="223.93" cy="458.35" r="6" /><title>PayrollError (error)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="test:contracts/payroll/src/test.rs" aria-label="payroll/test.rs, test"><circle cx="519.19" cy="457.92" r="6" /><title>payroll/test.rs (test)</title></g>
-<g class="node node--contract" tabindex="0" role="listitem" data-id="contract:Treasury" aria-label="Treasury, contract"><circle cx="488.89" cy="273.17" r="15" /><text class="node-label node-label--contract" x="488.89" y="303.17">Treasury</text><title>Treasury (contract)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.initialize" aria-label="initialize, function"><circle class="ring ring--warn" cx="388.87" cy="98.7" r="11" /><text class="flag" x="399.87" y="89.7">!</text><circle cx="388.87" cy="98.7" r="6" /><title>initialize (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="351.02" y="14" width="16" height="16" rx="2" /><title>DataKey::Admin (instance) (storage)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.instance.DataKey::Payroll" aria-label="DataKey::Payroll (instance), storage"><rect x="498" y="14" width="16" height="16" rx="2" /><title>DataKey::Payroll (instance) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.fund" aria-label="fund, function"><circle cx="548.21" cy="56.44" r="6" /><title>fund (function)</title></g>
-<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.persistent.DataKey::Balance(token)" aria-label="DataKey::Balance(token) (persistent), storage"><rect x="589.66" y="14" width="16" height="16" rx="2" /><title>DataKey::Balance(token) (persistent) (storage)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="event:Treasury.funded" aria-label="funded, event"><circle cx="734.27" cy="20" r="6" /><title>funded (event)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.withdraw" aria-label="withdraw, function"><circle cx="687.28" cy="81.7" r="6" /><title>withdraw (function)</title></g>
-<g class="node node--onchain" tabindex="0" role="listitem" data-id="asset:Token.token" aria-label="Token (token), asset"><path d="M 907.87 23.25 L 921.62 37 L 907.87 50.75 L 894.12 37 Z" /><text class="node-label node-label--onchain" x="907.87" y="63">Token (token)</text><title>Token (token) (asset)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="event:Treasury.withdrawn" aria-label="withdrawn, event"><circle cx="850.55" cy="20" r="6" /><title>withdrawn (event)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.balance" aria-label="balance, function"><circle cx="479.82" cy="120.14" r="6" /><title>balance (function)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.payroll_address" aria-label="payroll_address, function"><circle cx="572.33" cy="126.74" r="6" /><title>payroll_address (function)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="error:treasury.TreasuryError" aria-label="TreasuryError, error"><circle cx="655.27" cy="20" r="6" /><title>TreasuryError (error)</title></g>
-<g class="node node--other" tabindex="0" role="listitem" data-id="test:contracts/treasury/src/test.rs" aria-label="treasury/test.rs, test"><circle cx="639.38" cy="296.25" r="6" /><title>treasury/test.rs (test)</title></g></g>
-      </svg>
+    <div class="figure">
+      <div class="legend" role="list">
+        <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--contract)"></span> Contract</span>
+        <span class="legend-item" role="listitem"><span class="swatch swatch--diamond" style="background: var(--onchain)"></span> On-chain</span>
+        <span class="legend-item" role="listitem"><span class="swatch swatch--square" style="background: var(--storage)"></span> Storage key</span>
+        <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--other)"></span> Function, event, error, test</span>
+        <span class="legend-item" role="listitem"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg> Needs attention</span>
+      </div>
+
+      <div class="canvas">
+        <svg class="graph" viewBox="0 0 1100 720" role="list" aria-label="Project graph">
+          <g class="edges"><line class="edge edge--defines" data-from="contract:EmployeeRegistry" data-to="function:EmployeeRegistry.initialize" x1="723.55" y1="558.19" x2="936.28" y2="521.12"><title>EmployeeRegistry defines initialize</title></line>
+<line class="edge edge--writes" data-from="function:EmployeeRegistry.initialize" data-to="storage:EmployeeRegistry.instance.DataKey::Admin" x1="936.28" y1="521.12" x2="1059.49" y2="572.78"><title>initialize writes DataKey::Admin (instance)</title></line>
+<line class="edge edge--defines" data-from="contract:EmployeeRegistry" data-to="function:EmployeeRegistry.set_salary" x1="723.55" y1="558.19" x2="960.74" y2="643.71"><title>EmployeeRegistry defines set_salary</title></line>
+<line class="edge edge--reads" data-from="function:EmployeeRegistry.set_salary" data-to="storage:EmployeeRegistry.instance.DataKey::Admin" x1="960.74" y1="643.71" x2="1059.49" y2="572.78"><title>set_salary reads DataKey::Admin (instance)</title></line>
+<line class="edge edge--writes" data-from="function:EmployeeRegistry.set_salary" data-to="storage:EmployeeRegistry.persistent.DataKey::Salary(employee)" x1="960.74" y1="643.71" x2="1005.8" y2="698"><title>set_salary writes DataKey::Salary(employee) (persistent)</title></line>
+<line class="edge edge--emits" data-from="function:EmployeeRegistry.set_salary" data-to="event:EmployeeRegistry.salary_set" x1="960.74" y1="643.71" x2="1080" y2="700"><title>set_salary emits salary_set</title></line>
+<line class="edge edge--defines" data-from="contract:EmployeeRegistry" data-to="function:EmployeeRegistry.remove" x1="723.55" y1="558.19" x2="928.62" y2="601.71"><title>EmployeeRegistry defines remove</title></line>
+<line class="edge edge--reads" data-from="function:EmployeeRegistry.remove" data-to="storage:EmployeeRegistry.instance.DataKey::Admin" x1="928.62" y1="601.71" x2="1059.49" y2="572.78"><title>remove reads DataKey::Admin (instance)</title></line>
+<line class="edge edge--writes" data-from="function:EmployeeRegistry.remove" data-to="storage:EmployeeRegistry.persistent.DataKey::Salary(employee)" x1="928.62" y1="601.71" x2="1005.8" y2="698"><title>remove writes DataKey::Salary(employee) (persistent)</title></line>
+<line class="edge edge--defines" data-from="contract:EmployeeRegistry" data-to="function:EmployeeRegistry.salary_of" x1="723.55" y1="558.19" x2="868.82" y2="700"><title>EmployeeRegistry defines salary_of</title></line>
+<line class="edge edge--reads" data-from="function:EmployeeRegistry.salary_of" data-to="storage:EmployeeRegistry.persistent.DataKey::Salary(employee)" x1="868.82" y1="700" x2="1005.8" y2="698"><title>salary_of reads DataKey::Salary(employee) (persistent)</title></line>
+<line class="edge edge--defines" data-from="contract:Payroll" data-to="function:Payroll.initialize" x1="423.02" y1="507.54" x2="347.29" y2="656.17"><title>Payroll defines initialize</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.initialize" data-to="storage:Payroll.instance.DataKey::Admin" x1="347.29" y1="656.17" x2="312.46" y2="698"><title>initialize writes DataKey::Admin (instance)</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.initialize" data-to="storage:Payroll.instance.DataKey::Treasury" x1="347.29" y1="656.17" x2="386.73" y2="698"><title>initialize writes DataKey::Treasury (instance)</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.initialize" data-to="storage:Payroll.instance.DataKey::Registry" x1="347.29" y1="656.17" x2="443.01" y2="698"><title>initialize writes DataKey::Registry (instance)</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.initialize" data-to="storage:Payroll.instance.DataKey::PayToken" x1="347.29" y1="656.17" x2="256.49" y2="698"><title>initialize writes DataKey::PayToken (instance)</title></line>
+<line class="edge edge--defines" data-from="contract:Payroll" data-to="function:Payroll.pay" x1="423.02" y1="507.54" x2="438.82" y2="583.98"><title>Payroll defines pay</title></line>
+<line class="edge edge--reads" data-from="function:Payroll.pay" data-to="storage:Payroll.instance.DataKey::Admin" x1="438.82" y1="583.98" x2="312.46" y2="698"><title>pay reads DataKey::Admin (instance)</title></line>
+<line class="edge edge--reads" data-from="function:Payroll.pay" data-to="storage:Payroll.instance.DataKey::Registry" x1="438.82" y1="583.98" x2="443.01" y2="698"><title>pay reads DataKey::Registry (instance)</title></line>
+<line class="edge edge--reads" data-from="function:Payroll.pay" data-to="storage:Payroll.instance.DataKey::Treasury" x1="438.82" y1="583.98" x2="386.73" y2="698"><title>pay reads DataKey::Treasury (instance)</title></line>
+<line class="edge edge--reads" data-from="function:Payroll.pay" data-to="storage:Payroll.instance.DataKey::PayToken" x1="438.82" y1="583.98" x2="256.49" y2="698"><title>pay reads DataKey::PayToken (instance)</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.pay" data-to="storage:Payroll.persistent.DataKey::LastPaid(employee)" x1="438.82" y1="583.98" x2="266.67" y2="575.24"><title>pay writes DataKey::LastPaid(employee) (persistent)</title></line>
+<line class="edge edge--raises" data-from="function:Payroll.pay" data-to="error:payroll.PayrollError" x1="438.82" y1="583.98" x2="523.35" y2="700"><title>pay raises PayrollError</title></line>
+<line class="edge edge--emits" data-from="function:Payroll.pay" data-to="event:Payroll.paid" x1="438.82" y1="583.98" x2="585.24" y2="700"><title>pay emits paid</title></line>
+<line class="edge edge--defines" data-from="contract:Payroll" data-to="function:Payroll.set_pay_token" x1="423.02" y1="507.54" x2="181.31" y2="635.01"><title>Payroll defines set_pay_token</title></line>
+<line class="edge edge--writes" data-from="function:Payroll.set_pay_token" data-to="storage:Payroll.instance.DataKey::PayToken" x1="181.31" y1="635.01" x2="256.49" y2="698"><title>set_pay_token writes DataKey::PayToken (instance)</title></line>
+<line class="edge edge--emits" data-from="function:Payroll.set_pay_token" data-to="event:Payroll.token_changed" x1="181.31" y1="635.01" x2="20" y2="700"><title>set_pay_token emits token_changed</title></line>
+<line class="edge edge--defines" data-from="contract:Payroll" data-to="function:Payroll.last_paid" x1="423.02" y1="507.54" x2="253.13" y2="495.14"><title>Payroll defines last_paid</title></line>
+<line class="edge edge--reads" data-from="function:Payroll.last_paid" data-to="storage:Payroll.persistent.DataKey::LastPaid(employee)" x1="253.13" y1="495.14" x2="266.67" y2="575.24"><title>last_paid reads DataKey::LastPaid(employee) (persistent)</title></line>
+<line class="edge edge--defines" data-from="contract:Treasury" data-to="function:Treasury.initialize" x1="355.17" y1="268.27" x2="187.4" y2="126.72"><title>Treasury defines initialize</title></line>
+<line class="edge edge--writes" data-from="function:Treasury.initialize" data-to="storage:Treasury.instance.DataKey::Admin" x1="187.4" y1="126.72" x2="65.93" y2="22"><title>initialize writes DataKey::Admin (instance)</title></line>
+<line class="edge edge--writes" data-from="function:Treasury.initialize" data-to="storage:Treasury.instance.DataKey::Payroll" x1="187.4" y1="126.72" x2="299.35" y2="22"><title>initialize writes DataKey::Payroll (instance)</title></line>
+<line class="edge edge--defines" data-from="contract:Treasury" data-to="function:Treasury.fund" x1="355.17" y1="268.27" x2="161.53" y2="77.4"><title>Treasury defines fund</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.fund" data-to="storage:Treasury.instance.DataKey::Admin" x1="161.53" y1="77.4" x2="65.93" y2="22"><title>fund reads DataKey::Admin (instance)</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.fund" data-to="storage:Treasury.persistent.DataKey::Balance(token)" x1="161.53" y1="77.4" x2="252.08" y2="22"><title>fund reads DataKey::Balance(token) (persistent)</title></line>
+<line class="edge edge--writes" data-from="function:Treasury.fund" data-to="storage:Treasury.persistent.DataKey::Balance(token)" x1="161.53" y1="77.4" x2="252.08" y2="22"><title>fund writes DataKey::Balance(token) (persistent)</title></line>
+<line class="edge edge--raises" data-from="function:Treasury.fund" data-to="error:treasury.TreasuryError" x1="161.53" y1="77.4" x2="211.87" y2="20"><title>fund raises TreasuryError</title></line>
+<line class="edge edge--emits" data-from="function:Treasury.fund" data-to="event:Treasury.funded" x1="161.53" y1="77.4" x2="20" y2="20"><title>fund emits funded</title></line>
+<line class="edge edge--defines" data-from="contract:Treasury" data-to="function:Treasury.withdraw" x1="355.17" y1="268.27" x2="375.8" y2="42.47"><title>Treasury defines withdraw</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.withdraw" data-to="storage:Treasury.instance.DataKey::Payroll" x1="375.8" y1="42.47" x2="299.35" y2="22"><title>withdraw reads DataKey::Payroll (instance)</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.withdraw" data-to="storage:Treasury.persistent.DataKey::Balance(token)" x1="375.8" y1="42.47" x2="252.08" y2="22"><title>withdraw reads DataKey::Balance(token) (persistent)</title></line>
+<line class="edge edge--writes" data-from="function:Treasury.withdraw" data-to="storage:Treasury.persistent.DataKey::Balance(token)" x1="375.8" y1="42.47" x2="252.08" y2="22"><title>withdraw writes DataKey::Balance(token) (persistent)</title></line>
+<line class="edge edge--raises" data-from="function:Treasury.withdraw" data-to="error:treasury.TreasuryError" x1="375.8" y1="42.47" x2="211.87" y2="20"><title>withdraw raises TreasuryError</title></line>
+<line class="edge edge--calls" data-from="function:Treasury.withdraw" data-to="asset:Token.token" x1="375.8" y1="42.47" x2="507.28" y2="37"><title>withdraw calls Token (token)</title></line>
+<line class="edge edge--emits" data-from="function:Treasury.withdraw" data-to="event:Treasury.withdrawn" x1="375.8" y1="42.47" x2="565.05" y2="20"><title>withdraw emits withdrawn</title></line>
+<line class="edge edge--defines" data-from="contract:Treasury" data-to="function:Treasury.balance" x1="355.17" y1="268.27" x2="235.5" y2="177.84"><title>Treasury defines balance</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.balance" data-to="storage:Treasury.persistent.DataKey::Balance(token)" x1="235.5" y1="177.84" x2="252.08" y2="22"><title>balance reads DataKey::Balance(token) (persistent)</title></line>
+<line class="edge edge--defines" data-from="contract:Treasury" data-to="function:Treasury.payroll_address" x1="355.17" y1="268.27" x2="293.16" y2="108.61"><title>Treasury defines payroll_address</title></line>
+<line class="edge edge--reads" data-from="function:Treasury.payroll_address" data-to="storage:Treasury.instance.DataKey::Payroll" x1="293.16" y1="108.61" x2="299.35" y2="22"><title>payroll_address reads DataKey::Payroll (instance)</title></line>
+<line class="edge edge--raises" data-from="function:Treasury.payroll_address" data-to="error:treasury.TreasuryError" x1="293.16" y1="108.61" x2="211.87" y2="20"><title>payroll_address raises TreasuryError</title></line>
+<line class="edge edge--calls" data-from="contract:Payroll" data-to="contract:EmployeeRegistry" x1="423.02" y1="507.54" x2="723.55" y2="558.19"><title>Payroll calls EmployeeRegistry</title></line>
+<line class="edge edge--calls" data-from="contract:Payroll" data-to="contract:Treasury" x1="423.02" y1="507.54" x2="355.17" y2="268.27"><title>Payroll calls Treasury</title></line>
+<line class="edge edge--calls" data-from="function:Payroll.pay" data-to="contract:EmployeeRegistry" x1="438.82" y1="583.98" x2="723.55" y2="558.19"><title>pay calls EmployeeRegistry</title></line>
+<line class="edge edge--calls" data-from="function:Payroll.pay" data-to="contract:Treasury" x1="438.82" y1="583.98" x2="355.17" y2="268.27"><title>pay calls Treasury</title></line>
+<line class="edge edge--tests" data-from="test:contracts/payroll/src/test.rs" data-to="contract:EmployeeRegistry" x1="536.04" y1="416.35" x2="723.55" y2="558.19"><title>payroll/test.rs tests EmployeeRegistry</title></line>
+<line class="edge edge--tests" data-from="test:contracts/payroll/src/test.rs" data-to="contract:Payroll" x1="536.04" y1="416.35" x2="423.02" y2="507.54"><title>payroll/test.rs tests Payroll</title></line>
+<line class="edge edge--tests" data-from="test:contracts/payroll/src/test.rs" data-to="contract:Treasury" x1="536.04" y1="416.35" x2="355.17" y2="268.27"><title>payroll/test.rs tests Treasury</title></line>
+<line class="edge edge--tests" data-from="test:contracts/treasury/src/test.rs" data-to="contract:Treasury" x1="434.53" y1="156.7" x2="355.17" y2="268.27"><title>treasury/test.rs tests Treasury</title></line>
+<line class="edge edge--deployed_as" data-from="contract:EmployeeRegistry" data-to="deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN" x1="723.55" y1="558.19" x2="850.93" y2="458.31"><title>EmployeeRegistry deployed_as employee-registry @ testnet</title></line>
+<line class="edge edge--deployed_as" data-from="contract:Payroll" data-to="deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU" x1="423.02" y1="507.54" x2="561.07" y2="527.28"><title>Payroll deployed_as payroll @ testnet</title></line>
+<line class="edge edge--deployed_as" data-from="contract:Treasury" data-to="deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R" x1="355.17" y1="268.27" x2="501.14" y2="214.34"><title>Treasury deployed_as treasury @ testnet</title></line></g>
+          <g class="nodes"><g class="node node--contract" tabindex="0" role="listitem" data-id="contract:EmployeeRegistry" aria-label="EmployeeRegistry, contract"><circle cx="723.55" cy="558.19" r="15" /><text class="node-label node-label--contract" x="723.55" y="588.19">EmployeeRegistry</text><title>EmployeeRegistry (contract)</title></g>
+<g class="node node--other node--flagged" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.initialize" aria-label="initialize, function"><circle class="ring-gap" cx="936.28" cy="521.12" r="11" /><circle class="ring ring--warn" cx="936.28" cy="521.12" r="11" /><g class="flag" transform="translate(937.88 501.52) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><circle cx="936.28" cy="521.12" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="936.28" y="541.12">initialize</text><title>initialize (function)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:EmployeeRegistry.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="1051.49" y="564.78" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="end" x="1059.49" y="594.78">DataKey::Admin (instance)</text><title>DataKey::Admin (instance) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.set_salary" aria-label="set_salary, function"><circle cx="960.74" cy="643.71" r="6" /><text class="node-label node-label--near" text-anchor="end" x="960.74" y="663.71">set_salary</text><title>set_salary (function)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:EmployeeRegistry.persistent.DataKey::Salary(employee)" aria-label="DataKey::Salary(employee) (persistent), storage"><rect x="997.8" y="690" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="end" x="1005.8" y="720">DataKey::Salary(employee) (persistent)</text><title>DataKey::Salary(employee) (persistent) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="event:EmployeeRegistry.salary_set" aria-label="salary_set, event"><circle cx="1080" cy="700" r="6" /><text class="node-label node-label--near" text-anchor="end" x="1080" y="720">salary_set</text><title>salary_set (event)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.remove" aria-label="remove, function"><circle cx="928.62" cy="601.71" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="928.62" y="621.71">remove</text><title>remove (function)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:EmployeeRegistry.salary_of" aria-label="salary_of, function"><circle cx="868.82" cy="700" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="868.82" y="720">salary_of</text><title>salary_of (function)</title></g>
+<g class="node node--contract" tabindex="0" role="listitem" data-id="contract:Payroll" aria-label="Payroll, contract"><circle cx="423.02" cy="507.54" r="15" /><text class="node-label node-label--contract" x="423.02" y="537.54">Payroll</text><title>Payroll (contract)</title></g>
+<g class="node node--other node--flagged" tabindex="0" role="listitem" data-id="function:Payroll.initialize" aria-label="initialize, function"><circle class="ring-gap" cx="347.29" cy="656.17" r="11" /><circle class="ring ring--warn" cx="347.29" cy="656.17" r="11" /><g class="flag" transform="translate(348.89 636.57) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><circle cx="347.29" cy="656.17" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="347.29" y="676.17">initialize</text><title>initialize (function)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="304.46" y="690" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="312.46" y="720">DataKey::Admin (instance)</text><title>DataKey::Admin (instance) (storage)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Treasury" aria-label="DataKey::Treasury (instance), storage"><rect x="378.73" y="690" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="386.73" y="720">DataKey::Treasury (instance)</text><title>DataKey::Treasury (instance) (storage)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::Registry" aria-label="DataKey::Registry (instance), storage"><rect x="435.01" y="690" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="443.01" y="720">DataKey::Registry (instance)</text><title>DataKey::Registry (instance) (storage)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Payroll.instance.DataKey::PayToken" aria-label="DataKey::PayToken (instance), storage"><rect x="248.49" y="690" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="256.49" y="720">DataKey::PayToken (instance)</text><title>DataKey::PayToken (instance) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.pay" aria-label="pay, function"><circle cx="438.82" cy="583.98" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="438.82" y="603.98">pay</text><title>pay (function)</title></g>
+<g class="node node--storage node--flagged" tabindex="0" role="listitem" data-id="storage:Payroll.persistent.DataKey::LastPaid(employee)" aria-label="DataKey::LastPaid(employee) (persistent), storage"><circle class="ring-gap" cx="266.67" cy="575.24" r="13" /><circle class="ring ring--warn" cx="266.67" cy="575.24" r="13" /><g class="flag" transform="translate(270.27 553.64) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><rect x="258.67" y="567.24" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="266.67" y="597.24">DataKey::LastPaid(employee) (persistent)</text><title>DataKey::LastPaid(employee) (persistent) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="event:Payroll.paid" aria-label="paid, event"><circle cx="585.24" cy="700" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="585.24" y="720">paid</text><title>paid (event)</title></g>
+<g class="node node--other node--flagged" tabindex="0" role="listitem" data-id="function:Payroll.set_pay_token" aria-label="set_pay_token, function"><circle class="ring-gap" cx="181.31" cy="635.01" r="11" /><circle class="ring ring--warn" cx="181.31" cy="635.01" r="11" /><g class="flag" transform="translate(182.91 615.41) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><circle cx="181.31" cy="635.01" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="181.31" y="655.01">set_pay_token</text><title>set_pay_token (function)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="event:Payroll.token_changed" aria-label="token_changed, event"><circle cx="20" cy="700" r="6" /><text class="node-label node-label--near" text-anchor="start" x="20" y="720">token_changed</text><title>token_changed (event)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Payroll.last_paid" aria-label="last_paid, function"><circle cx="253.13" cy="495.14" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="253.13" y="515.14">last_paid</text><title>last_paid (function)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="error:payroll.PayrollError" aria-label="PayrollError, error"><circle cx="523.35" cy="700" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="523.35" y="720">PayrollError</text><title>PayrollError (error)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="test:contracts/payroll/src/test.rs" aria-label="payroll/test.rs, test"><circle cx="536.04" cy="416.35" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="536.04" y="436.35">payroll/test.rs</text><title>payroll/test.rs (test)</title></g>
+<g class="node node--contract" tabindex="0" role="listitem" data-id="contract:Treasury" aria-label="Treasury, contract"><circle cx="355.17" cy="268.27" r="15" /><text class="node-label node-label--contract" x="355.17" y="298.27">Treasury</text><title>Treasury (contract)</title></g>
+<g class="node node--other node--flagged" tabindex="0" role="listitem" data-id="function:Treasury.initialize" aria-label="initialize, function"><circle class="ring-gap" cx="187.4" cy="126.72" r="11" /><circle class="ring ring--warn" cx="187.4" cy="126.72" r="11" /><g class="flag" transform="translate(189 107.12) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><circle cx="187.4" cy="126.72" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="187.4" y="146.72">initialize</text><title>initialize (function)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.instance.DataKey::Admin" aria-label="DataKey::Admin (instance), storage"><rect x="57.93" y="14" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="start" x="65.93" y="44">DataKey::Admin (instance)</text><title>DataKey::Admin (instance) (storage)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.instance.DataKey::Payroll" aria-label="DataKey::Payroll (instance), storage"><rect x="291.35" y="14" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="299.35" y="44">DataKey::Payroll (instance)</text><title>DataKey::Payroll (instance) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.fund" aria-label="fund, function"><circle cx="161.53" cy="77.4" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="161.53" y="97.4">fund</text><title>fund (function)</title></g>
+<g class="node node--storage" tabindex="0" role="listitem" data-id="storage:Treasury.persistent.DataKey::Balance(token)" aria-label="DataKey::Balance(token) (persistent), storage"><rect x="244.08" y="14" width="16" height="16" rx="2" /><text class="node-label node-label--near" text-anchor="middle" x="252.08" y="44">DataKey::Balance(token) (persistent)</text><title>DataKey::Balance(token) (persistent) (storage)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="event:Treasury.funded" aria-label="funded, event"><circle cx="20" cy="20" r="6" /><text class="node-label node-label--near" text-anchor="start" x="20" y="40">funded</text><title>funded (event)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.withdraw" aria-label="withdraw, function"><circle cx="375.8" cy="42.47" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="375.8" y="62.47">withdraw</text><title>withdraw (function)</title></g>
+<g class="node node--onchain" tabindex="0" role="listitem" data-id="asset:Token.token" aria-label="Token (token), asset"><path d="M 507.28 23.25 L 521.03 37 L 507.28 50.75 L 493.53 37 Z" /><text class="node-label node-label--onchain" x="507.28" y="63">Token (token)</text><title>Token (token) (asset)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="event:Treasury.withdrawn" aria-label="withdrawn, event"><circle cx="565.05" cy="20" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="565.05" y="40">withdrawn</text><title>withdrawn (event)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.balance" aria-label="balance, function"><circle cx="235.5" cy="177.84" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="235.5" y="197.84">balance</text><title>balance (function)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="function:Treasury.payroll_address" aria-label="payroll_address, function"><circle cx="293.16" cy="108.61" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="293.16" y="128.61">payroll_address</text><title>payroll_address (function)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="error:treasury.TreasuryError" aria-label="TreasuryError, error"><circle cx="211.87" cy="20" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="211.87" y="40">TreasuryError</text><title>TreasuryError (error)</title></g>
+<g class="node node--other" tabindex="0" role="listitem" data-id="test:contracts/treasury/src/test.rs" aria-label="treasury/test.rs, test"><circle cx="434.53" cy="156.7" r="6" /><text class="node-label node-label--near" text-anchor="middle" x="434.53" y="176.7">treasury/test.rs</text><title>treasury/test.rs (test)</title></g>
+<g class="node node--onchain" tabindex="0" role="listitem" data-id="deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN" aria-label="employee-registry @ testnet, deployment"><path d="M 850.93 444.56 L 864.68 458.31 L 850.93 472.06 L 837.18 458.31 Z" /><text class="node-label node-label--onchain" x="850.93" y="484.31">employee-registry @ testnet</text><title>employee-registry @ testnet (deployment)</title></g>
+<g class="node node--onchain" tabindex="0" role="listitem" data-id="deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC" aria-label="pay-token @ testnet, deployment"><path d="M 1018 23.25 L 1031.75 37 L 1018 50.75 L 1004.25 37 Z" /><text class="node-label node-label--onchain" x="1018" y="63">pay-token @ testnet</text><title>pay-token @ testnet (deployment)</title></g>
+<g class="node node--onchain" tabindex="0" role="listitem" data-id="deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU" aria-label="payroll @ testnet, deployment"><path d="M 561.07 513.53 L 574.82 527.28 L 561.07 541.03 L 547.32 527.28 Z" /><text class="node-label node-label--onchain" x="561.07" y="553.28">payroll @ testnet</text><title>payroll @ testnet (deployment)</title></g>
+<g class="node node--onchain node--flagged" tabindex="0" role="listitem" data-id="deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R" aria-label="treasury @ testnet, deployment"><circle class="ring-gap" cx="501.14" cy="214.34" r="16" /><circle class="ring ring--warn" cx="501.14" cy="214.34" r="16" /><g class="flag" transform="translate(507.74 189.74) scale(1.15)"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></g><path d="M 501.14 200.59 L 514.89 214.34 L 501.14 228.09 L 487.39 214.34 Z" /><text class="node-label node-label--onchain" x="501.14" y="240.34">treasury @ testnet</text><title>treasury @ testnet (deployment)</title></g></g>
+        </svg>
+      </div>
     </div>
-    <aside class="panel" id="panel">
-      <h2>Select an element</h2>
-      <p>Click any node to see what it is, where it lives, and what it connects to. Everything here came from the source and from read-only queries to the network.</p>
+    <aside class="side">
+      <section class="findings"><h2>Worth knowing <span class="count">7</span></h2><h3 class="grade grade--warn">Needs attention</h3><ul class="finding-list"><li><button type="button" class="finding finding--warn" data-id="deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">drift</span><span class="msg">treasury @ testnet runs a different build than your local source.</span></span></button></li><li><button type="button" class="finding finding--warn" data-id="storage:Payroll.persistent.DataKey::LastPaid(employee)"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">ttl</span><span class="msg">Persistent key DataKey::LastPaid(employee) is never given an extend_ttl; it can expire and become unreachable.</span><span class="where">contracts/payroll/src/lib.rs:93</span></span></button></li><li><button type="button" class="finding finding--warn" data-id="function:EmployeeRegistry.initialize"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">auth</span><span class="msg">EmployeeRegistry.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role.</span><span class="where">contracts/employee-registry/src/lib.rs:17</span></span></button></li><li><button type="button" class="finding finding--warn" data-id="function:Payroll.initialize"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">auth</span><span class="msg">Payroll.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role.</span><span class="where">contracts/payroll/src/lib.rs:43</span></span></button></li><li><button type="button" class="finding finding--warn" data-id="function:Payroll.set_pay_token"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">auth</span><span class="msg">Payroll.set_pay_token writes state but never calls require_auth.</span><span class="where">contracts/payroll/src/lib.rs:104</span></span></button></li><li><button type="button" class="finding finding--warn" data-id="function:Treasury.initialize"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">auth</span><span class="msg">Treasury.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role.</span><span class="where">contracts/treasury/src/lib.rs:30</span></span></button></li><li><button type="button" class="finding finding--warn"><span class="sev"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg></span><span class="said"><span class="tag">tests</span><span class="msg">Every test module calls mock_all_auths, which disables authorization in the test environment. The access control on EmployeeRegistry, Payroll, Treasury is therefore never exercised by the suite.</span><span class="where">project-wide</span></span></button></li></ul></section>
+      <div id="panel" class="detail">
+        <h2>Select an element</h2>
+        <p>Click any node — or any finding — to see what it is, where it lives, and what it connects to. Everything here came from the source and from read-only queries to the network.</p>
+      </div>
     </aside>
   </div>
 
@@ -277,86 +485,187 @@
     <summary>Every element as a table</summary>
     <table>
       <thead><tr><th>Name</th><th>Kind</th><th>Source</th><th>Status</th></tr></thead>
-      <tbody><tr><td>Token (token)</td><td>asset</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>EmployeeRegistry</td><td>contract</td><td>contracts/employee-registry/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>Payroll</td><td>contract</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>Treasury</td><td>contract</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>PayrollError</td><td>error</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>TreasuryError</td><td>error</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>funded</td><td>event</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>paid</td><td>event</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>salary_set</td><td>event</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>token_changed</td><td>event</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>withdrawn</td><td>event</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>balance</td><td>function</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>fund</td><td>function</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>initialize</td><td>function</td><td>contracts/employee-registry/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>initialize</td><td>function</td><td>contracts/payroll/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>initialize</td><td>function</td><td>contracts/treasury/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>last_paid</td><td>function</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>pay</td><td>function</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>payroll_address</td><td>function</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>remove</td><td>function</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>salary_of</td><td>function</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>set_pay_token</td><td>function</td><td>contracts/payroll/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>set_salary</td><td>function</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>withdraw</td><td>function</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Admin (instance)</td><td>storage</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Admin (instance)</td><td>storage</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Admin (instance)</td><td>storage</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Balance(token) (persistent)</td><td>storage</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::LastPaid(employee) (persistent)</td><td>storage</td><td>contracts/payroll/src/lib.rs</td><td>⚠ needs attention</td></tr>
-<tr><td>DataKey::Payroll (instance)</td><td>storage</td><td>contracts/treasury/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::PayToken (instance)</td><td>storage</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Registry (instance)</td><td>storage</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Salary(employee) (persistent)</td><td>storage</td><td>contracts/employee-registry/src/lib.rs</td><td></td></tr>
-<tr><td>DataKey::Treasury (instance)</td><td>storage</td><td>contracts/payroll/src/lib.rs</td><td></td></tr>
-<tr><td>payroll/test.rs</td><td>test</td><td>contracts/payroll/src/test.rs</td><td></td></tr>
-<tr><td>treasury/test.rs</td><td>test</td><td>contracts/treasury/src/test.rs</td><td></td></tr></tbody>
+      <tbody><tr><td>Token (token)</td><td class="col-kind">asset</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>EmployeeRegistry</td><td class="col-kind">contract</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>Payroll</td><td class="col-kind">contract</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>Treasury</td><td class="col-kind">contract</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>employee-registry @ testnet</td><td class="col-kind">deployment</td><td class="col-path"></td><td class="col-state"></td></tr>
+<tr><td>pay-token @ testnet</td><td class="col-kind">deployment</td><td class="col-path"></td><td class="col-state"></td></tr>
+<tr><td>payroll @ testnet</td><td class="col-kind">deployment</td><td class="col-path"></td><td class="col-state"></td></tr>
+<tr><td>treasury @ testnet</td><td class="col-kind">deployment</td><td class="col-path"></td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>PayrollError</td><td class="col-kind">error</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>TreasuryError</td><td class="col-kind">error</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>funded</td><td class="col-kind">event</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>paid</td><td class="col-kind">event</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>salary_set</td><td class="col-kind">event</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>token_changed</td><td class="col-kind">event</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>withdrawn</td><td class="col-kind">event</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>balance</td><td class="col-kind">function</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>fund</td><td class="col-kind">function</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>initialize</td><td class="col-kind">function</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>initialize</td><td class="col-kind">function</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>initialize</td><td class="col-kind">function</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>last_paid</td><td class="col-kind">function</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>pay</td><td class="col-kind">function</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>payroll_address</td><td class="col-kind">function</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>remove</td><td class="col-kind">function</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>salary_of</td><td class="col-kind">function</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>set_pay_token</td><td class="col-kind">function</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>set_salary</td><td class="col-kind">function</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>withdraw</td><td class="col-kind">function</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Admin (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Admin (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Admin (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Balance(token) (persistent)</td><td class="col-kind">storage</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::LastPaid(employee) (persistent)</td><td class="col-kind">storage</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"><svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>needs attention</td></tr>
+<tr><td>DataKey::PayToken (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Payroll (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/treasury/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Registry (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Salary(employee) (persistent)</td><td class="col-kind">storage</td><td class="col-path">contracts/employee-registry/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>DataKey::Treasury (instance)</td><td class="col-kind">storage</td><td class="col-path">contracts/payroll/src/lib.rs</td><td class="col-state"></td></tr>
+<tr><td>payroll/test.rs</td><td class="col-kind">test</td><td class="col-path">contracts/payroll/src/test.rs</td><td class="col-state"></td></tr>
+<tr><td>treasury/test.rs</td><td class="col-kind">test</td><td class="col-path">contracts/treasury/src/test.rs</td><td class="col-state"></td></tr></tbody>
     </table>
   </details>
 
-  <footer>Generated by stellar-memory from the scan of 2026-08-06T02:38:54.805Z. This file is self-contained: no network, no server.</footer>
+  <footer>Generated by stellar-memory from the scan of 2026-08-06T19:08:19.261Z. This file is self-contained: no network, no server.</footer>
 </div>
 
 <script>
-const DETAIL = {"contract:EmployeeRegistry":{"title":"EmployeeRegistry","kind":"contract","path":"contracts/employee-registry/src/lib.rs","line":12,"summary":"Soroban contract with 4 public functions.","findings":[{"severity":"warn","category":"tests","message":"Every test module calls mock_all_auths, which disables authorization in the test environment. The access control on EmployeeRegistry, Payroll, Treasury is therefore never exercised by the suite."}],"links":[{"kind":"defines","other":"employee-registry","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"set_salary","direction":"out"},{"kind":"defines","other":"remove","direction":"out"},{"kind":"defines","other":"salary_of","direction":"out"},{"kind":"calls","other":"Payroll","direction":"in"},{"kind":"calls","other":"pay","direction":"in"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:EmployeeRegistry.initialize":{"title":"initialize","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":17,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"EmployeeRegistry.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"}]},"storage:EmployeeRegistry.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/employee-registry/src/lib.rs","line":19,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"set_salary","direction":"in"},{"kind":"reads","other":"remove","direction":"in"}]},"function:EmployeeRegistry.set_salary":{"title":"set_salary","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":23,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Salary(employee) (persistent)","direction":"out"},{"kind":"emits","other":"salary_set","direction":"out"}]},"storage:EmployeeRegistry.persistent.DataKey::Salary(employee)":{"title":"DataKey::Salary(employee) (persistent)","kind":"storage","path":"contracts/employee-registry/src/lib.rs","line":28,"summary":null,"findings":[],"links":[{"kind":"writes","other":"set_salary","direction":"in"},{"kind":"writes","other":"remove","direction":"in"},{"kind":"reads","other":"salary_of","direction":"in"}]},"event:EmployeeRegistry.salary_set":{"title":"salary_set","kind":"event","path":"contracts/employee-registry/src/lib.rs","line":23,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"set_salary","direction":"in"}]},"function:EmployeeRegistry.remove":{"title":"remove","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":36,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Salary(employee) (persistent)","direction":"out"}]},"function:EmployeeRegistry.salary_of":{"title":"salary_of","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":45,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Salary(employee) (persistent)","direction":"out"}]},"contract:Payroll":{"title":"Payroll","kind":"contract","path":"contracts/payroll/src/lib.rs","line":38,"summary":"Soroban contract with 4 public functions.","findings":[],"links":[{"kind":"defines","other":"payroll","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"pay","direction":"out"},{"kind":"defines","other":"set_pay_token","direction":"out"},{"kind":"defines","other":"last_paid","direction":"out"},{"kind":"calls","other":"EmployeeRegistry","direction":"out"},{"kind":"calls","other":"Treasury","direction":"out"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"mentions","other":"missing require_auth — anyone can repoint payroll at a worthless token.","direction":"in"},{"kind":"mentions","other":"Complete withdrawal tests for Payroll","direction":"in"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:Payroll.initialize":{"title":"initialize","kind":"function","path":"contracts/payroll/src/lib.rs","line":43,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Payroll.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Treasury (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Registry (instance)","direction":"out"},{"kind":"writes","other":"DataKey::PayToken (instance)","direction":"out"}]},"storage:Payroll.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":51,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::Treasury":{"title":"DataKey::Treasury (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":52,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::Registry":{"title":"DataKey::Registry (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":53,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::PayToken":{"title":"DataKey::PayToken (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":54,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"},{"kind":"writes","other":"set_pay_token","direction":"in"}]},"function:Payroll.pay":{"title":"pay","kind":"function","path":"contracts/payroll/src/lib.rs","line":58,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Registry (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Treasury (instance)","direction":"out"},{"kind":"reads","other":"DataKey::PayToken (instance)","direction":"out"},{"kind":"writes","other":"DataKey::LastPaid(employee) (persistent)","direction":"out"},{"kind":"raises","other":"PayrollError","direction":"out"},{"kind":"emits","other":"paid","direction":"out"},{"kind":"calls","other":"EmployeeRegistry","direction":"out"},{"kind":"calls","other":"Treasury","direction":"out"}]},"storage:Payroll.persistent.DataKey::LastPaid(employee)":{"title":"DataKey::LastPaid(employee) (persistent)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":93,"summary":null,"findings":[{"severity":"warn","category":"ttl","message":"Persistent key DataKey::LastPaid(employee) is never given an extend_ttl; it can expire and become unreachable."}],"links":[{"kind":"writes","other":"pay","direction":"in"},{"kind":"reads","other":"last_paid","direction":"in"}]},"event:Payroll.paid":{"title":"paid","kind":"event","path":"contracts/payroll/src/lib.rs","line":58,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"pay","direction":"in"}]},"function:Payroll.set_pay_token":{"title":"set_pay_token","kind":"function","path":"contracts/payroll/src/lib.rs","line":104,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Payroll.set_pay_token writes state but never calls require_auth."}],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"writes","other":"DataKey::PayToken (instance)","direction":"out"},{"kind":"emits","other":"token_changed","direction":"out"}]},"event:Payroll.token_changed":{"title":"token_changed","kind":"event","path":"contracts/payroll/src/lib.rs","line":104,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"set_pay_token","direction":"in"}]},"function:Payroll.last_paid":{"title":"last_paid","kind":"function","path":"contracts/payroll/src/lib.rs","line":111,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"reads","other":"DataKey::LastPaid(employee) (persistent)","direction":"out"}]},"error:payroll.PayrollError":{"title":"PayrollError","kind":"error","path":"contracts/payroll/src/lib.rs","line":28,"summary":"Contract error enum with 4 variants. The discriminants are published ABI.","findings":[],"links":[{"kind":"raises","other":"pay","direction":"in"}]},"test:contracts/payroll/src/test.rs":{"title":"payroll/test.rs","kind":"test","path":"contracts/payroll/src/test.rs","line":null,"summary":"Test module.","findings":[],"links":[{"kind":"tests","other":"EmployeeRegistry","direction":"out"},{"kind":"tests","other":"Payroll","direction":"out"},{"kind":"tests","other":"Treasury","direction":"out"}]},"contract:Treasury":{"title":"Treasury","kind":"contract","path":"contracts/treasury/src/lib.rs","line":24,"summary":"Soroban contract with 5 public functions.","findings":[],"links":[{"kind":"defines","other":"treasury","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"fund","direction":"out"},{"kind":"defines","other":"withdraw","direction":"out"},{"kind":"defines","other":"balance","direction":"out"},{"kind":"defines","other":"payroll_address","direction":"out"},{"kind":"calls","other":"Payroll","direction":"in"},{"kind":"calls","other":"pay","direction":"in"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"tests","other":"treasury/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"mentions","other":"pay() needs an end-to-end test with a real Treasury and","direction":"in"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:Treasury.initialize":{"title":"initialize","kind":"function","path":"contracts/treasury/src/lib.rs","line":30,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Treasury.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Payroll (instance)","direction":"out"}]},"storage:Treasury.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":32,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"fund","direction":"in"}]},"storage:Treasury.instance.DataKey::Payroll":{"title":"DataKey::Payroll (instance)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":33,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"withdraw","direction":"in"},{"kind":"reads","other":"payroll_address","direction":"in"}]},"function:Treasury.fund":{"title":"fund","kind":"function","path":"contracts/treasury/src/lib.rs","line":37,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"writes","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"},{"kind":"emits","other":"funded","direction":"out"}]},"storage:Treasury.persistent.DataKey::Balance(token)":{"title":"DataKey::Balance(token) (persistent)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":46,"summary":null,"findings":[],"links":[{"kind":"reads","other":"fund","direction":"in"},{"kind":"writes","other":"fund","direction":"in"},{"kind":"reads","other":"withdraw","direction":"in"},{"kind":"writes","other":"withdraw","direction":"in"},{"kind":"reads","other":"balance","direction":"in"}]},"event:Treasury.funded":{"title":"funded","kind":"event","path":"contracts/treasury/src/lib.rs","line":37,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"fund","direction":"in"}]},"function:Treasury.withdraw":{"title":"withdraw","kind":"function","path":"contracts/treasury/src/lib.rs","line":56,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Payroll (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"writes","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"},{"kind":"calls","other":"Token (token)","direction":"out"},{"kind":"emits","other":"withdrawn","direction":"out"}]},"asset:Token.token":{"title":"Token (token)","kind":"asset","path":"contracts/treasury/src/lib.rs","line":56,"summary":"Token contract this project moves value through.","findings":[],"links":[{"kind":"calls","other":"withdraw","direction":"in"}]},"event:Treasury.withdrawn":{"title":"withdrawn","kind":"event","path":"contracts/treasury/src/lib.rs","line":56,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"withdraw","direction":"in"}]},"function:Treasury.balance":{"title":"balance","kind":"function","path":"contracts/treasury/src/lib.rs","line":91,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"}]},"function:Treasury.payroll_address":{"title":"payroll_address","kind":"function","path":"contracts/treasury/src/lib.rs","line":98,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Payroll (instance)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"}]},"error:treasury.TreasuryError":{"title":"TreasuryError","kind":"error","path":"contracts/treasury/src/lib.rs","line":15,"summary":"Contract error enum with 3 variants. The discriminants are published ABI.","findings":[],"links":[{"kind":"raises","other":"fund","direction":"in"},{"kind":"raises","other":"withdraw","direction":"in"},{"kind":"raises","other":"payroll_address","direction":"in"}]},"test:contracts/treasury/src/test.rs":{"title":"treasury/test.rs","kind":"test","path":"contracts/treasury/src/test.rs","line":null,"summary":"Test module.","findings":[],"links":[{"kind":"tests","other":"Treasury","direction":"out"}]}};
+const DETAIL = {"contract:EmployeeRegistry":{"title":"EmployeeRegistry","kind":"contract","path":"contracts/employee-registry/src/lib.rs","line":12,"summary":"Soroban contract with 4 public functions.","findings":[],"links":[{"kind":"defines","other":"employee-registry","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"set_salary","direction":"out"},{"kind":"defines","other":"remove","direction":"out"},{"kind":"defines","other":"salary_of","direction":"out"},{"kind":"calls","other":"Payroll","direction":"in"},{"kind":"calls","other":"pay","direction":"in"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"deployed_as","other":"employee-registry @ testnet","direction":"out"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:EmployeeRegistry.initialize":{"title":"initialize","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":17,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"EmployeeRegistry.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"}]},"storage:EmployeeRegistry.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/employee-registry/src/lib.rs","line":19,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"set_salary","direction":"in"},{"kind":"reads","other":"remove","direction":"in"}]},"function:EmployeeRegistry.set_salary":{"title":"set_salary","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":23,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Salary(employee) (persistent)","direction":"out"},{"kind":"emits","other":"salary_set","direction":"out"}]},"storage:EmployeeRegistry.persistent.DataKey::Salary(employee)":{"title":"DataKey::Salary(employee) (persistent)","kind":"storage","path":"contracts/employee-registry/src/lib.rs","line":28,"summary":null,"findings":[],"links":[{"kind":"writes","other":"set_salary","direction":"in"},{"kind":"writes","other":"remove","direction":"in"},{"kind":"reads","other":"salary_of","direction":"in"}]},"event:EmployeeRegistry.salary_set":{"title":"salary_set","kind":"event","path":"contracts/employee-registry/src/lib.rs","line":23,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"set_salary","direction":"in"}]},"function:EmployeeRegistry.remove":{"title":"remove","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":36,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Salary(employee) (persistent)","direction":"out"}]},"function:EmployeeRegistry.salary_of":{"title":"salary_of","kind":"function","path":"contracts/employee-registry/src/lib.rs","line":45,"summary":null,"findings":[],"links":[{"kind":"defines","other":"EmployeeRegistry","direction":"in"},{"kind":"reads","other":"DataKey::Salary(employee) (persistent)","direction":"out"}]},"contract:Payroll":{"title":"Payroll","kind":"contract","path":"contracts/payroll/src/lib.rs","line":38,"summary":"Soroban contract with 4 public functions.","findings":[],"links":[{"kind":"defines","other":"payroll","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"pay","direction":"out"},{"kind":"defines","other":"set_pay_token","direction":"out"},{"kind":"defines","other":"last_paid","direction":"out"},{"kind":"calls","other":"EmployeeRegistry","direction":"out"},{"kind":"calls","other":"Treasury","direction":"out"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"mentions","other":"missing require_auth — anyone can repoint payroll at a worthless token.","direction":"in"},{"kind":"mentions","other":"Complete withdrawal tests for Payroll","direction":"in"},{"kind":"deployed_as","other":"payroll @ testnet","direction":"out"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:Payroll.initialize":{"title":"initialize","kind":"function","path":"contracts/payroll/src/lib.rs","line":43,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Payroll.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Treasury (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Registry (instance)","direction":"out"},{"kind":"writes","other":"DataKey::PayToken (instance)","direction":"out"}]},"storage:Payroll.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":51,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::Treasury":{"title":"DataKey::Treasury (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":52,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::Registry":{"title":"DataKey::Registry (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":53,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"}]},"storage:Payroll.instance.DataKey::PayToken":{"title":"DataKey::PayToken (instance)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":54,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"pay","direction":"in"},{"kind":"writes","other":"set_pay_token","direction":"in"}]},"function:Payroll.pay":{"title":"pay","kind":"function","path":"contracts/payroll/src/lib.rs","line":58,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Registry (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Treasury (instance)","direction":"out"},{"kind":"reads","other":"DataKey::PayToken (instance)","direction":"out"},{"kind":"writes","other":"DataKey::LastPaid(employee) (persistent)","direction":"out"},{"kind":"raises","other":"PayrollError","direction":"out"},{"kind":"emits","other":"paid","direction":"out"},{"kind":"calls","other":"EmployeeRegistry","direction":"out"},{"kind":"calls","other":"Treasury","direction":"out"}]},"storage:Payroll.persistent.DataKey::LastPaid(employee)":{"title":"DataKey::LastPaid(employee) (persistent)","kind":"storage","path":"contracts/payroll/src/lib.rs","line":93,"summary":null,"findings":[{"severity":"warn","category":"ttl","message":"Persistent key DataKey::LastPaid(employee) is never given an extend_ttl; it can expire and become unreachable."}],"links":[{"kind":"writes","other":"pay","direction":"in"},{"kind":"reads","other":"last_paid","direction":"in"}]},"event:Payroll.paid":{"title":"paid","kind":"event","path":"contracts/payroll/src/lib.rs","line":58,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"pay","direction":"in"}]},"function:Payroll.set_pay_token":{"title":"set_pay_token","kind":"function","path":"contracts/payroll/src/lib.rs","line":104,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Payroll.set_pay_token writes state but never calls require_auth."}],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"writes","other":"DataKey::PayToken (instance)","direction":"out"},{"kind":"emits","other":"token_changed","direction":"out"}]},"event:Payroll.token_changed":{"title":"token_changed","kind":"event","path":"contracts/payroll/src/lib.rs","line":104,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"set_pay_token","direction":"in"}]},"function:Payroll.last_paid":{"title":"last_paid","kind":"function","path":"contracts/payroll/src/lib.rs","line":111,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Payroll","direction":"in"},{"kind":"reads","other":"DataKey::LastPaid(employee) (persistent)","direction":"out"}]},"error:payroll.PayrollError":{"title":"PayrollError","kind":"error","path":"contracts/payroll/src/lib.rs","line":28,"summary":"Contract error enum with 4 variants. The discriminants are published ABI.","findings":[],"links":[{"kind":"raises","other":"pay","direction":"in"}]},"test:contracts/payroll/src/test.rs":{"title":"payroll/test.rs","kind":"test","path":"contracts/payroll/src/test.rs","line":null,"summary":"Test module.","findings":[],"links":[{"kind":"tests","other":"EmployeeRegistry","direction":"out"},{"kind":"tests","other":"Payroll","direction":"out"},{"kind":"tests","other":"Treasury","direction":"out"}]},"contract:Treasury":{"title":"Treasury","kind":"contract","path":"contracts/treasury/src/lib.rs","line":24,"summary":"Soroban contract with 5 public functions.","findings":[],"links":[{"kind":"defines","other":"treasury","direction":"in"},{"kind":"defines","other":"initialize","direction":"out"},{"kind":"defines","other":"fund","direction":"out"},{"kind":"defines","other":"withdraw","direction":"out"},{"kind":"defines","other":"balance","direction":"out"},{"kind":"defines","other":"payroll_address","direction":"out"},{"kind":"calls","other":"Payroll","direction":"in"},{"kind":"calls","other":"pay","direction":"in"},{"kind":"tests","other":"payroll/test.rs","direction":"in"},{"kind":"tests","other":"treasury/test.rs","direction":"in"},{"kind":"documents","other":"README.md","direction":"in"},{"kind":"mentions","other":"pay() needs an end-to-end test with a real Treasury and","direction":"in"},{"kind":"deployed_as","other":"treasury @ testnet","direction":"out"},{"kind":"defines","other":"private-payroll","direction":"in"}]},"function:Treasury.initialize":{"title":"initialize","kind":"function","path":"contracts/treasury/src/lib.rs","line":30,"summary":null,"findings":[{"severity":"warn","category":"auth","message":"Treasury.initialize authorizes only `admin`, a caller-supplied parameter, and writes instance storage it never read — anyone can call it and claim that role."}],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"writes","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"writes","other":"DataKey::Payroll (instance)","direction":"out"}]},"storage:Treasury.instance.DataKey::Admin":{"title":"DataKey::Admin (instance)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":32,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"fund","direction":"in"}]},"storage:Treasury.instance.DataKey::Payroll":{"title":"DataKey::Payroll (instance)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":33,"summary":null,"findings":[],"links":[{"kind":"writes","other":"initialize","direction":"in"},{"kind":"reads","other":"withdraw","direction":"in"},{"kind":"reads","other":"payroll_address","direction":"in"}]},"function:Treasury.fund":{"title":"fund","kind":"function","path":"contracts/treasury/src/lib.rs","line":37,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Admin (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"writes","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"},{"kind":"emits","other":"funded","direction":"out"}]},"storage:Treasury.persistent.DataKey::Balance(token)":{"title":"DataKey::Balance(token) (persistent)","kind":"storage","path":"contracts/treasury/src/lib.rs","line":46,"summary":null,"findings":[],"links":[{"kind":"reads","other":"fund","direction":"in"},{"kind":"writes","other":"fund","direction":"in"},{"kind":"reads","other":"withdraw","direction":"in"},{"kind":"writes","other":"withdraw","direction":"in"},{"kind":"reads","other":"balance","direction":"in"}]},"event:Treasury.funded":{"title":"funded","kind":"event","path":"contracts/treasury/src/lib.rs","line":37,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"fund","direction":"in"}]},"function:Treasury.withdraw":{"title":"withdraw","kind":"function","path":"contracts/treasury/src/lib.rs","line":56,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Payroll (instance)","direction":"out"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"writes","other":"DataKey::Balance(token) (persistent)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"},{"kind":"calls","other":"Token (token)","direction":"out"},{"kind":"emits","other":"withdrawn","direction":"out"}]},"asset:Token.token":{"title":"Token (token)","kind":"asset","path":"contracts/treasury/src/lib.rs","line":56,"summary":"Token contract this project moves value through.","findings":[],"links":[{"kind":"calls","other":"withdraw","direction":"in"}]},"event:Treasury.withdrawn":{"title":"withdrawn","kind":"event","path":"contracts/treasury/src/lib.rs","line":56,"summary":"Published via `env.events().publish(...)`.","findings":[],"links":[{"kind":"emits","other":"withdraw","direction":"in"}]},"function:Treasury.balance":{"title":"balance","kind":"function","path":"contracts/treasury/src/lib.rs","line":91,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Balance(token) (persistent)","direction":"out"}]},"function:Treasury.payroll_address":{"title":"payroll_address","kind":"function","path":"contracts/treasury/src/lib.rs","line":98,"summary":null,"findings":[],"links":[{"kind":"defines","other":"Treasury","direction":"in"},{"kind":"reads","other":"DataKey::Payroll (instance)","direction":"out"},{"kind":"raises","other":"TreasuryError","direction":"out"}]},"error:treasury.TreasuryError":{"title":"TreasuryError","kind":"error","path":"contracts/treasury/src/lib.rs","line":15,"summary":"Contract error enum with 3 variants. The discriminants are published ABI.","findings":[],"links":[{"kind":"raises","other":"fund","direction":"in"},{"kind":"raises","other":"withdraw","direction":"in"},{"kind":"raises","other":"payroll_address","direction":"in"}]},"test:contracts/treasury/src/test.rs":{"title":"treasury/test.rs","kind":"test","path":"contracts/treasury/src/test.rs","line":null,"summary":"Test module.","findings":[],"links":[{"kind":"tests","other":"Treasury","direction":"out"}]},"deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN":{"title":"employee-registry @ testnet","kind":"deployment","path":null,"line":null,"summary":"Live at `CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN`.","findings":[],"links":[{"kind":"deployed_as","other":"EmployeeRegistry","direction":"in"}]},"deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC":{"title":"pay-token @ testnet","kind":"deployment","path":null,"line":null,"summary":"Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.","findings":[],"links":[]},"deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU":{"title":"payroll @ testnet","kind":"deployment","path":null,"line":null,"summary":"Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.","findings":[],"links":[{"kind":"deployed_as","other":"Payroll","direction":"in"}]},"deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R":{"title":"treasury @ testnet","kind":"deployment","path":null,"line":null,"summary":"Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` — out of sync with local source.","findings":[{"severity":"warn","category":"drift","message":"treasury @ testnet runs a different build than your local source."}],"links":[{"kind":"deployed_as","other":"Treasury","direction":"in"}]}};
+const WARN_ICON = '<svg class="ic ic--warn" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="m14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2zM7.25 5.5h1.5v4.4h-1.5zM8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z" /></svg>';
+const NOTE_ICON = '<svg class="ic ic--note" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.35" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 7.4v4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /><circle cx="8" cy="4.6" r="1" /></svg>';
 const panel = document.getElementById('panel');
+const svg = document.querySelector('svg');
+const EDGES = Array.from(svg.querySelectorAll('.edge'));
+const NODES = new Map(Array.from(svg.querySelectorAll('.node')).map(n => [n.dataset.id, n]));
 let selected = null;
 
+/**
+ * Back to the whole graph, with nothing claiming to be chosen.
+ *
+ * Every path through the page goes through here, including the one that leads
+ * straight back out: a node left outlined, or a finding row left highlighted,
+ * describes a selection the drawing no longer shows.
+ */
+function clear() {
+  svg.classList.remove('is-focused');
+  for (const el of EDGES) el.classList.remove('is-near');
+  for (const el of NODES.values()) el.classList.remove('is-near');
+  if (selected) selected.classList.remove('is-selected');
+  selected = null;
+  for (const row of document.querySelectorAll('.finding.is-active')) row.classList.remove('is-active');
+}
+
+/** Light up one node and everything one step away from it; dim the rest. */
+function focusOn(id) {
+  clear();
+  if (!id || !NODES.has(id)) return;
+
+  NODES.get(id).classList.add('is-near');
+  for (const edge of EDGES) {
+    if (edge.dataset.from !== id && edge.dataset.to !== id) continue;
+    edge.classList.add('is-near');
+    const a = NODES.get(edge.dataset.from);
+    const b = NODES.get(edge.dataset.to);
+    if (a) a.classList.add('is-near');
+    if (b) b.classList.add('is-near');
+  }
+  svg.classList.add('is-focused');
+}
+
 function show(id) {
+  // First, so that a row whose node is not on the graph still puts back
+  // whatever the last one lit up rather than adding to it.
+  focusOn(id);
   const d = DETAIL[id];
   if (!d) return;
-  if (selected) selected.classList.remove('is-selected');
-  selected = document.querySelector('[data-id="' + CSS.escape(id) + '"]');
+  selected = svg.querySelector('.node[data-id="' + CSS.escape(id) + '"]');
   if (selected) selected.classList.add('is-selected');
 
+  // Every value below came out of the vault, which is a file in the repository
+  // rather than something this process produced. Kind, category and relation are
+  // unions in the type and plain strings on disk, so they are escaped like the
+  // free text beside them.
+  // The severity class is branched rather than interpolated: it is a union in
+  // the type and a plain string on disk, and this one ends up inside a class
+  // attribute, where escaping is not the same question as escaping text.
   const findings = d.findings.map(f =>
-    '<div class="finding"><span class="tag">' + f.category + '</span>' + escapeHtml(f.message) + '</div>'
+    '<div class="finding finding--' + (f.severity === 'warn' ? 'warn' : 'info') + '">' +
+    '<span class="sev">' + (f.severity === 'warn' ? WARN_ICON : NOTE_ICON) + '</span>' +
+    '<span class="said"><span class="tag">' + escapeHtml(f.category) + '</span>' +
+    '<span class="msg">' + escapeHtml(f.message) + '</span></span></div>'
   ).join('');
   const links = d.links.map(l =>
-    '<div class="rel"><code>' + (l.direction === 'out' ? '→ ' : '← ') + l.kind + '</code><span>' + escapeHtml(l.other) + '</span></div>'
+    '<div class="rel"><code>' + (l.direction === 'out' ? '→ ' : '← ') + escapeHtml(l.kind) + '</code><span>' + escapeHtml(l.other) + '</span></div>'
   ).join('');
 
   panel.innerHTML =
-    '<div class="kind">' + d.kind + '</div>' +
+    '<div class="kind">' + escapeHtml(d.kind) + '</div>' +
     '<h2>' + escapeHtml(d.title) + '</h2>' +
     (d.summary ? '<p>' + escapeHtml(d.summary) + '</p>' : '') +
-    (d.path ? '<div class="path">' + escapeHtml(d.path) + (d.line ? ':' + d.line : '') + '</div>' : '') +
+    (d.path ? '<div class="path">' + escapeHtml(d.path) + (d.line ? ':' + escapeHtml(d.line) : '') + '</div>' : '') +
     findings +
     (links ? '<h2 style="margin-top:16px">Connections</h2>' + links : '');
+  panel.scrollIntoView({ block: 'nearest' });
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
-for (const node of document.querySelectorAll('.node')) {
+for (const node of NODES.values()) {
   node.addEventListener('click', () => show(node.dataset.id));
   node.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(node.dataset.id); }
   });
 }
+
+// Every row, not only the ones that own a node: a finding about the project as
+// a whole has nothing to select, and clicking it puts the whole graph back,
+// which is exactly what it is a finding about. A row that did nothing at all
+// would be a button that lies.
+for (const row of document.querySelectorAll('.finding')) {
+  // Marked after show(), which clears whichever row was marked before it.
+  row.addEventListener('click', () => {
+    show(row.dataset.id);
+    row.classList.add('is-active');
+  });
+}
+
+// Clicking away from a node, or Escape, puts the whole graph back.
+svg.addEventListener('click', (e) => { if (!e.target.closest('.node')) focusOn(null); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') focusOn(null); });
+
+/**
+ * Light or dark, when the room disagrees with the laptop.
+ *
+ * The palette already follows the machine's own setting, which is right nearly
+ * everywhere and wrong in the one room this page was built for: a projector
+ * that washes out a dark page, or a lit hall that glares off a light one, with
+ * the laptop's preference set weeks ago. The stylesheet was already written to
+ * be overridden in both directions, so this is a stamp on the root element.
+ *
+ * Everything here is guarded. The page's script is also run headless against a
+ * minimal DOM, and a redesign that threw on a missing element there would take
+ * the click handling above with it.
+ */
+(function () {
+  const root = document.documentElement;
+  const button = document.querySelector('.theme');
+  if (!root || !root.dataset || !button) return;
+  const label = button.querySelector ? button.querySelector('.theme-label') : null;
+  const wantsDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+  let dark = root.dataset.theme ? root.dataset.theme === 'dark' : wantsDark;
+  const paint = () => { if (label) label.textContent = dark ? 'Light' : 'Dark'; };
+  paint();
+  button.addEventListener('click', () => {
+    dark = !dark;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    paint();
+  });
+})();
+
 </script>
 </body>
 </html>
