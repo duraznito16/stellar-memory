@@ -40,6 +40,15 @@ function textOf(result: unknown): string {
   return content.map((block) => block.text ?? '').join('\n');
 }
 
+/**
+ * The same reply also arrives as typed fields. Tools that declare an
+ * outputSchema must populate this — the SDK rejects the call otherwise — so an
+ * agent never has to parse a string and hope.
+ */
+function structuredOf(result: unknown): Record<string, unknown> {
+  return (result as { structuredContent?: Record<string, unknown> }).structuredContent ?? {};
+}
+
 test('advertises the agent-facing toolset', async () => {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name).sort();
@@ -73,8 +82,23 @@ test('search_memory finds a contract by name', async () => {
   const body = textOf(
     await client.callTool({ name: 'search_memory', arguments: { query: 'treasury', limit: 5 } }),
   );
-  const hits = JSON.parse(body) as { id: string; kind: string }[];
-  assert.ok(hits.some((h) => h.id === 'contract:Treasury' && h.kind === 'contract'));
+  const { results } = JSON.parse(body) as { results: { id: string; kind: string }[] };
+  assert.ok(results.some((h) => h.id === 'contract:Treasury' && h.kind === 'contract'));
+});
+
+test('search_memory narrows to one kind without losing lower-ranked matches', async () => {
+  const body = textOf(
+    await client.callTool({
+      name: 'search_memory',
+      arguments: { query: 'pay', kind: 'storage', limit: 20 },
+    }),
+  );
+  const { results } = JSON.parse(body) as { results: { id: string; kind: string }[] };
+
+  assert.ok(results.length > 0, 'storage keys mentioning "pay" exist in the demo');
+  // Ranking runs before the filter. Filtering a page of ten mixed results would
+  // drop storage keys that ranked below unrelated contracts and functions.
+  assert.ok(results.every((h) => h.kind === 'storage'));
 });
 
 test('list_contracts reports the cross-contract call graph', async () => {
@@ -93,7 +117,7 @@ test('list_contracts reports the cross-contract call graph', async () => {
 
 test('project_signals surfaces the real defects, and only those', async () => {
   const body = textOf(await client.callTool({ name: 'project_signals', arguments: {} }));
-  const signals = JSON.parse(body) as { severity: string; message: string }[];
+  const { signals } = JSON.parse(body) as { signals: { severity: string; message: string }[] };
   const warnings = signals.filter((s) => s.severity === 'warn').map((s) => s.message);
 
   assert.ok(
@@ -163,4 +187,109 @@ test('describe_node suggests alternatives for an unknown id', async () => {
   );
   assert.match(body, /No node with id/);
   assert.match(body, /Did you mean/);
+});
+
+test('every tool declares itself read-only', async () => {
+  const { tools } = await client.listTools();
+
+  // Read-only is this project's central safety claim. A host that cannot see it
+  // has to ask a human to approve all eight calls, so the claim has to live in
+  // the protocol and not only in the README.
+  for (const tool of tools) {
+    assert.equal(tool.annotations?.readOnlyHint, true, `${tool.name} must declare readOnlyHint`);
+    assert.equal(
+      tool.annotations?.openWorldHint,
+      false,
+      `${tool.name} answers from the local vault alone`,
+    );
+  }
+});
+
+test('data tools advertise an output schema, and the two encodings agree', async () => {
+  const { tools } = await client.listTools();
+  const byName = new Map(tools.map((t) => [t.name, t]));
+
+  for (const name of [
+    'search_memory',
+    'describe_node',
+    'list_contracts',
+    'project_signals',
+    'storage_layout',
+    'value_surface',
+    'recent_changes',
+  ]) {
+    assert.ok(byName.get(name)?.outputSchema, `${name} needs an outputSchema`);
+  }
+  // The digest is prose meant to be read. Wrapping it in a field would be
+  // ceremony, so it stays a text tool and this asserts that is deliberate.
+  assert.equal(byName.get('project_overview')?.outputSchema, undefined);
+
+  const result = await client.callTool({ name: 'list_contracts', arguments: {} });
+  const structured = structuredOf(result);
+  assert.ok(Array.isArray(structured.contracts), 'structuredContent carries the contracts');
+  // A client reading text and a client reading fields must never be told
+  // different things about the same project.
+  assert.deepEqual(JSON.parse(textOf(result)), structured);
+});
+
+test('list_contracts filters to one contract, and explains an empty result', async () => {
+  const one = structuredOf(
+    await client.callTool({ name: 'list_contracts', arguments: { contract: 'Treasury' } }),
+  ) as { contracts: { name: string }[] };
+  assert.deepEqual(
+    one.contracts.map((c) => c.name),
+    ['Treasury'],
+  );
+
+  const bad = structuredOf(
+    await client.callTool({ name: 'list_contracts', arguments: { contract: 'Treasry' } }),
+  ) as { contracts: unknown[]; note?: string };
+  assert.equal(bad.contracts.length, 0);
+  // An unexplained empty list reads as "this project has no contracts", which
+  // is a worse answer than an error.
+  assert.match(bad.note ?? '', /No contract named/);
+  assert.match(bad.note ?? '', /Treasury/, 'the note names what could have been asked for');
+});
+
+test('storage_layout isolates the keys that can silently expire', async () => {
+  const result = structuredOf(
+    await client.callTool({ name: 'storage_layout', arguments: { missing_ttl_only: true } }),
+  ) as { keys: { key?: string; durability?: string; ttl_extended: boolean }[] };
+
+  assert.ok(result.keys.length > 0, 'the demo ships one such key on purpose');
+  assert.ok(result.keys.every((k) => k.durability === 'persistent' && !k.ttl_extended));
+  assert.ok(result.keys.some((k) => /LastPaid/.test(k.key ?? '')));
+  // Balance and Salary do extend their TTLs. Listing them here would be the
+  // false positive this whole tool exists to avoid.
+  assert.ok(!result.keys.some((k) => /Balance|Salary/.test(k.key ?? '')));
+});
+
+test('project_signals filters by category', async () => {
+  const result = structuredOf(
+    await client.callTool({ name: 'project_signals', arguments: { category: 'ttl' } }),
+  ) as { signals: { category: string }[] };
+
+  assert.ok(result.signals.length > 0);
+  assert.ok(result.signals.every((s) => s.category === 'ttl'));
+});
+
+test('a contract filter follows edges rather than parsing ids', async () => {
+  // `DataKey::LastPaid(employee)` contains a dot inside its parentheses, so any
+  // filter that split the node id on "." would lose it.
+  const scoped = structuredOf(
+    await client.callTool({ name: 'storage_layout', arguments: { contract: 'Payroll' } }),
+  ) as { keys: { key?: string }[] };
+
+  assert.ok(scoped.keys.some((k) => /LastPaid/.test(k.key ?? '')));
+  // Treasury's own balance key is reached only through Treasury's functions.
+  assert.ok(!scoped.keys.some((k) => /DataKey::Balance/.test(k.key ?? '')));
+});
+
+test('describe_node reports a miss as data, not only as prose', async () => {
+  const result = structuredOf(
+    await client.callTool({ name: 'describe_node', arguments: { id: 'contract:Treasry' } }),
+  ) as { found: boolean; suggestions: string[] };
+
+  assert.equal(result.found, false);
+  assert.ok(result.suggestions.includes('contract:Treasury'), 'the near miss is offered as an id');
 });
