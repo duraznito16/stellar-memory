@@ -185,7 +185,7 @@ node scripts/mcp-call.mjs describe_node '{"id":"contract:Payroll"}'
 
 ## See it
 
-![The live window: three contracts and their storage as a graph, with all six findings named beside it — the TTL warning on DataKey::LastPaid, four authorization findings, and one project-wide test finding](docs/media/ui-live.png)
+![The live window: three contracts and their storage as a graph, with all seven findings named beside it — the build drift on treasury @ testnet, the TTL warning on DataKey::LastPaid, four authorization findings, and one project-wide test finding](docs/media/ui-live.png)
 
 ```bash
 stellar memory ui
@@ -214,9 +214,9 @@ The demo ships `set_pay_token` with a real defect and a `FIXME` admitting it:
 the function rewrites which token salaries are paid in, and never checks who is
 asking. `stellar memory ui --watch` is running; nothing else is.
 
-**Before** — six findings, one of them that function:
+**Before** — seven findings, one of them that function:
 
-![The window before the edit: Worth knowing 6, listing the missing require_auth on Payroll.set_pay_token](docs/media/watch-before.png)
+![The window before the edit: Worth knowing 7, listing the missing require_auth on Payroll.set_pay_token](docs/media/watch-before.png)
 
 Add the check the FIXME asks for — read the admin out of instance storage and
 require its authorization — and **save**. No command is run:
@@ -226,9 +226,11 @@ let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
 admin.require_auth();
 ```
 
-**After** — five:
+**After** — six, and the window says so itself: the counter carries a `was 7`
+beside it, and the relationship count goes up by one, because the fix added a
+read of `DataKey::Admin` that was not there before.
 
-![The window after saving: Worth knowing 5, the set_pay_token finding gone](docs/media/watch-after.png)
+![The window after saving: Worth knowing 6, the header counting 6 need attention where it was 7, and the set_pay_token finding gone](docs/media/watch-after.png)
 
 The finding did not merely disappear. In the page's own data the function went
 from
@@ -468,34 +470,36 @@ machine.
 
 ```
 src/
-  scanner/     rust.ts     1144   Soroban source analysis — the hard part
-               scan.ts     1191   graph construction and correlation
+  scanner/     rust.ts     1302   Soroban source analysis — the hard part
+               scan.ts     1296   graph construction and correlation
                cargo.ts     126   workspace parsing
                walk.ts      106   gitignore-aware file walk
-  core/        query.ts     685   signals, search, resume, neighbourhoods
+  core/        query.ts     731   signals, search, resume, neighbourhoods
                types.ts     247   the graph model
-               git.ts       118   HEAD, last commit, dates
-  stellar/     cli.ts       262   read-only Stellar CLI bridge
+               git.ts       121   HEAD, last commit, dates
+  stellar/     cli.ts       266   read-only Stellar CLI bridge
                spec.ts      140   SCSpecEntry → functions, errors, events
-  store/       html.ts      915   the self-contained page and the live page
-               render.ts    380   Markdown notes
-               vault.ts     215   read/write .stellar-memory/
+  store/       html.ts     1300   the self-contained page and the live page
+               render.ts    384   Markdown notes
+               vault.ts     269   read/write .stellar-memory/
   ui/          serve.ts     353   loopback HTTP + SSE hub + shutdown
                watch.ts     249   debounced, non-overlapping watchers
                open.ts      242   cross-platform window launcher
-  commands/    mcp.ts       338   the 8 agent-facing tools
+  commands/    mcp.ts       802   the 8 agent-facing tools
                ui.ts        206   wiring for the live window
-               graph.ts     200   tree, mermaid, dot, json, html
+               graph.ts     229   tree, mermaid, dot, json, html
 ```
 
-`rust.ts` and `scan.ts` are 40% of the codebase because the claim this tool makes
-is that its facts are true. Everything else reads what they produce.
+`rust.ts` and `scan.ts` are a quarter of the codebase, and the largest thing in
+it after them is the page they end up drawn on. That weighting is the point:
+the claim this tool makes is that its facts are true, and everything else reads
+what those two produce.
 
 ## The committable artifact
 
 The window is for working; the file is for the record.
 
-![The same graph written as one self-contained HTML file, with the project-wide finding beside it](docs/media/graph-file.png)
+![The same graph written as one self-contained HTML file, with all seven findings listed beside it and a footer naming the scan it came from — no network, no server](docs/media/graph-file.png)
 
 ```bash
 stellar memory graph --format html
@@ -614,7 +618,7 @@ flowchart LR
     P(["push / PR"])
 
     subgraph T["test · Node 24"]
-        T1["54 unit tests"]
+        T1["66 unit tests"]
     end
     subgraph D["dogfood · Node 20"]
         D1["scan the demo offline"] --> D2["gate fires on a real failure"]
@@ -668,9 +672,14 @@ here, and blocking merges on it would only train people to ignore the badge.
 
 ```bash
 npm run build       # compile
-npm test            # parser, MCP handshake, and CI-gate tests
+npm test            # builds first, then parser, MCP handshake, and CI-gate tests
 npm run typecheck
 ```
+
+`npm test` compiles before it runs anything, because the MCP and live-window
+tests spawn `dist/index.js` as a real subprocess — they exercise the CLI that
+ships, not an import of the same source. On a fresh clone there is no `dist/`
+yet, and a suite whose first failure is `ENOENT` teaches a newcomer nothing.
 
 Running the package needs **Node 20+**. Running the *tests* needs **Node 22.6+**,
 because they are TypeScript executed through Node's native type stripping. CI

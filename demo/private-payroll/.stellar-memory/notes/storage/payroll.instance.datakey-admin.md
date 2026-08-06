@@ -19,7 +19,6 @@ tags:
 
 - **Durability:** `instance`
 - **Key:** `DataKey::Admin`
-- ⚠️ No `extend_ttl` call was found for this key. instance entries expire once their TTL lapses, and the data becomes unreachable.
 
 ## Connections
 

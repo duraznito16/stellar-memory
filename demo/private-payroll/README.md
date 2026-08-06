@@ -41,10 +41,23 @@ the local source and rebuilt, but never redeployed — so the Wasm running on
 testnet is older than this tree. That is the drift `stellar-memory scan` detects
 by comparing Wasm hashes:
 
+A Wasm hash is the SHA-256 of the file, so the local half needs nothing but a
+digest, and the deployed half is one read away:
+
 ```bash
-stellar contract info hash --wasm target/wasm32v1-none/release/treasury.wasm
-stellar contract info hash --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R --network testnet
+# what this tree builds
+shasum -a 256 target/wasm32v1-none/release/treasury.wasm
+
+# what testnet is actually running
+stellar contract fetch \
+  --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R \
+  --network testnet --out-file /tmp/treasury-onchain.wasm
+shasum -a 256 /tmp/treasury-onchain.wasm
 ```
+
+The two differ, and `stellar-memory scan` reports it as `stale`. On Windows,
+`Get-FileHash -Algorithm SHA256` is the digest. `contract fetch` downloads and
+nothing else — every network call this tool makes is read-only.
 
 ## Defects
 

@@ -5,7 +5,7 @@ title: Payroll
 path: contracts/payroll/src/lib.rs
 summary: Soroban contract with 4 public functions.
 first_seen: 2026-08-06T05:42:22.027Z
-last_changed: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T21:43:06.877Z
 tags:
   - stellar-memory
   - kind/contract
@@ -25,7 +25,7 @@ Soroban contract with 4 public functions.
 - `set_pay_token(env: Env, token: Address)` — [[functions/payroll.set_pay_token|set_pay_token]]
 - `last_paid(env: Env, employee: Address) -> u32` — [[functions/payroll.last_paid|last_paid]]
 
-**Local Wasm hash:** `827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c`
+**Local Wasm hash:** `7f0be93b08d2507d2357e6bcf4940b8aa82ca03befe47338c85193a58cd3263c`
 
 ## Connections
 
@@ -34,7 +34,7 @@ Soroban contract with 4 public functions.
 - [[contracts/treasury|Treasury]] — via `treasury::Client` in `pay`
 
 **Deployed as**
-- [[deployments/testnet.cdvmjuz4yzig6jme7lgvew6mpntv5dkr6vcazlnradinpldvhlb4z7xu|payroll @ testnet]]
+- [[deployments/testnet.cdvmjuz4yzig6jme7lgvew6mpntv5dkr6vcazlnradinpldvhlb4z7xu|payroll @ testnet]] — deployed build is older than source
 
 **Defined in**
 - [[crates/payroll|payroll]]
@@ -55,7 +55,7 @@ Soroban contract with 4 public functions.
 <details><summary>Where this came from</summary>
 
 - Parsed from `contracts/payroll/src/lib.rs:38`
-- Reported by `stellar contract info hash --wasm target/wasm32v1-none/release/payroll.wasm` (ground truth)
+- Read from `target/wasm32v1-none/release/payroll.wasm`
 
 </details>
 <!-- /stellar-memory:auto -->

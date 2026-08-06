@@ -117,7 +117,7 @@ export interface ContractData {
   crate: string;
   /** Path to the built .wasm, if one was found. */
   wasmPath?: string;
-  /** SHA-256 of the local .wasm, from `stellar contract info hash`. */
+  /** SHA-256 of the bytes of the local .wasm. Needs no CLI and no network. */
   localWasmHash?: string;
   functions: string[];
   /** Traits implemented via `impl <Trait> for <Type>`, e.g. `token::TokenInterface`. */

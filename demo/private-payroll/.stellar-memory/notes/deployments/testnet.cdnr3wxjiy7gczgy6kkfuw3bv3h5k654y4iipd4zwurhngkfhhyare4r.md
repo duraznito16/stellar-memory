@@ -37,7 +37,7 @@ Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` — out of sy
 
 <details><summary>Where this came from</summary>
 
-- Reported by `stellar contract info hash --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` on `testnet` (ground truth)
+- Reported by `stellar contract fetch --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` on `testnet` (ground truth)
 
 </details>
 <!-- /stellar-memory:auto -->

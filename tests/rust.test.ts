@@ -150,7 +150,10 @@ test('collects events, types and errors', () => {
 
   assert.deepEqual(a.types.map((t) => t.name), ['DataKey']);
   assert.deepEqual(a.errors.map((t) => t.name), ['PayrollError']);
-  assert.equal(a.isTest, true, 'file contains a #[cfg(test)] module');
+  // A `#[cfg(test)] mod test` at the foot of a file full of production code
+  // gates that module, not the file. Calling this file a test discards the
+  // contract it defines.
+  assert.equal(a.isTest, false, 'the contract file is not a test module');
 });
 
 test('resolves a key held in a local binding', () => {
@@ -578,4 +581,368 @@ test('a plain Rust file yields no contracts', () => {
   const a = analyseRustFile('src/util.rs', 'pub fn add(a: u32, b: u32) -> u32 { a + b }');
   assert.equal(a.contracts.length, 0);
   assert.equal(a.usesSorobanSdk, false);
+});
+
+/**
+ * The canonical token layout: bookkeeping lives in a sibling module whose free
+ * functions are named after the token interface itself — `balance`, `transfer`,
+ * `mint`. That collision with the methods called on a token client is what makes
+ * this shape the hardest case for a pattern analyser.
+ */
+const BALANCE_RS = `
+use soroban_sdk::{Address, Env, Symbol};
+use crate::storage_types::DataKey;
+
+pub fn balance(e: &Env, addr: &Address) -> i128 {
+    e.storage()
+        .persistent()
+        .get(&DataKey::Balance(addr.clone()))
+        .unwrap_or(0)
+}
+
+pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    let from_key = DataKey::Balance(from.clone());
+    let from_balance: i128 = e.storage().persistent().get(&from_key).unwrap_or(0);
+    e.storage().persistent().set(&from_key, &(from_balance - amount));
+    e.storage().persistent().extend_ttl(&from_key, 100, 200);
+
+    let to_key = DataKey::Balance(to.clone());
+    let to_balance: i128 = e.storage().persistent().get(&to_key).unwrap_or(0);
+    e.storage().persistent().set(&to_key, &(to_balance + amount));
+    e.storage().persistent().extend_ttl(&to_key, 100, 200);
+
+    e.events().publish((Symbol::new(e, "moved"), from.clone()), amount);
+}
+`;
+
+const LEDGER_RS = `
+#![no_std]
+use soroban_sdk::{contract, contractimpl, token, Address, Env};
+
+mod balance;
+mod storage_types;
+use crate::balance::transfer;
+use crate::storage_types::DataKey;
+
+/// A string, not code: the stripper keeps literals, because storage keys and
+/// Wasm paths live inside them. It sits outside every function body.
+pub const USAGE: &str = "settle(from, to, amount) calls transfer(&e, ..) on our own books";
+
+#[contract]
+pub struct Ledger;
+
+#[contractimpl]
+impl Ledger {
+    /// Push tokens this contract holds out through an external token contract.
+    /// None of this ledger's own books move.
+    pub fn sweep(e: Env, token_id: Address, to: Address, amount: i128) {
+        to.require_auth();
+        // The transfer(...) below belongs to the token contract, not to us.
+        token::Client::new(&e, &token_id).transfer(&e.current_contract_address(), &to, &amount);
+    }
+
+    /// Move balance between two accounts on this contract's own books.
+    pub fn settle(e: Env, from: Address, to: Address, amount: i128) {
+        from.require_auth();
+        transfer(&e, &from, &to, amount);
+    }
+
+    /// A helper called in a struct-literal field is still a call to the helper:
+    /// the single colon there is not a path separator.
+    pub fn snapshot(e: Env, who: Address) -> Receipt {
+        Receipt { held: balance(&e, &who), at: e.ledger().sequence() }
+    }
+
+    /// This ledger's own total, read here rather than in the helper module.
+    pub fn total(e: Env) -> i128 {
+        e.storage().instance().get(&DataKey::Total).unwrap_or(0)
+    }
+}
+`;
+
+test('a method named like a free helper does not fold that helper in', () => {
+  // `\\b` matches after a dot, so `token::Client::new(&e, &t).transfer(..)` read
+  // as a call to the free `transfer` of balance.rs, and that helper's storage,
+  // events and client calls were attributed to a function that touches none of
+  // them — an edge with nothing behind it.
+  const helpers = collectHelpersFrom(BALANCE_RS, 'contracts/ledger/src/balance.rs');
+  const fns = analyseRustFile('contracts/ledger/src/lib.rs', LEDGER_RS, helpers)
+    .contracts[0]!.functions;
+
+  const sweep = fns.find((f) => f.name === 'sweep')!;
+  assert.deepEqual(sweep.storage, [], 'calling a method is not calling the helper');
+  assert.deepEqual(sweep.events, [], 'nor does it publish the helper’s event');
+  assert.deepEqual(sweep.clientCalls, ['token']);
+  assert.deepEqual(
+    sweep.contractCalls[0]!.methods,
+    ['transfer'],
+    'what it does call is the token client',
+  );
+
+  // The real, unqualified call to the helper still folds — that is the whole
+  // reason the mechanism exists.
+  const settle = fns.find((f) => f.name === 'settle')!;
+  assert.ok(settle.storage.some((s) => s.op === 'set' && s.key === 'DataKey::Balance(from)'));
+  assert.ok(settle.storage.some((s) => s.op === 'extend_ttl' && s.key === 'DataKey::Balance(to)'));
+  assert.deepEqual(settle.events, ['moved']);
+
+  const snapshot = fns.find((f) => f.name === 'snapshot')!;
+  assert.ok(
+    snapshot.storage.some((s) => s.op === 'get' && s.key === 'DataKey::Balance(addr)'),
+    'a struct-literal field is not a path separator',
+  );
+});
+
+test('a #[cfg(test)] module at the foot of a file leaves the file productive', () => {
+  // The outer attribute gates that module; the inner `#![cfg(test)]` gates the
+  // file. Treating the two alike classified a real balance.rs as a test, so its
+  // types and errors left the graph and production code was shown as a test.
+  const src = `
+use soroban_sdk::{contracterror, contracttype, Address, Env};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Balance(Address),
+    Allowance(Address),
+}
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum BalanceError {
+    InsufficientBalance = 1,
+    Overflow = 2,
+}
+
+pub fn read_balance(e: &Env, addr: Address) -> i128 {
+    e.storage().persistent().get(&DataKey::Balance(addr)).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_address_reads_zero() {
+        let e = Env::default();
+        assert_eq!(read_balance(&e, Address::generate(&e)), 0);
+    }
+}
+`;
+  const a = analyseRustFile('contracts/token/src/balance.rs', src);
+  assert.equal(a.isTest, false, 'the outer attribute gates the module, not the file');
+  assert.deepEqual(a.types.map((t) => t.name), ['DataKey']);
+  assert.deepEqual(a.errors.map((e) => e.name), ['BalanceError']);
+});
+
+test('a file that is only a test module still counts as one', () => {
+  const inner = `
+#![cfg(test)]
+use soroban_sdk::{testutils::Address as _, Address, Env};
+use crate::{Payroll, PayrollClient};
+
+#[test]
+fn initialize_stores_wiring() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = PayrollClient::new(&env, &env.register(Payroll, ()));
+    client.initialize(&Address::generate(&env));
+}
+`;
+  assert.equal(analyseRustFile('contracts/payroll/src/harness.rs', inner).isTest, true);
+
+  // The outer form, when the module it gates is everything the file contains.
+  const outer = `
+use soroban_sdk::{testutils::Address as _, Address, Env};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pays_an_employee() {
+        let env = Env::default();
+        env.mock_all_auths();
+    }
+}
+`;
+  assert.equal(analyseRustFile('contracts/payroll/src/harness.rs', outer).isTest, true);
+
+  // `#[cfg(test)] mod test;` names a sibling file. It says nothing about this
+  // one, which is where the contract lives.
+  const declaresSibling = `
+use soroban_sdk::{contract, contractimpl, Env};
+#[contract]
+pub struct Payroll;
+#[contractimpl]
+impl Payroll {
+    pub fn version(env: Env) -> u32 { 1 }
+}
+
+#[cfg(test)]
+mod test;
+`;
+  const a = analyseRustFile('contracts/payroll/src/lib.rs', declaresSibling);
+  assert.equal(a.isTest, false);
+  assert.equal(a.contracts.length, 1);
+});
+
+test('reads a contract whose macros are written with their full path', () => {
+  // A crate that avoids the prelude writes `#[soroban_sdk::contract]`. Matching
+  // only the bare attribute found no contract, no functions, no types and no
+  // errors, and the file fell through to being filed as a plain module — the
+  // main contract vanished from the graph without a single warning.
+  const src = `
+#![no_std]
+use soroban_sdk::{Address, Env, Symbol};
+
+#[soroban_sdk::contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Admin,
+    Balance(Address),
+}
+
+#[soroban_sdk::contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum VaultError {
+    NotAuthorized = 1,
+    NotInitialized = 2,
+}
+
+#[soroban_sdk::contractevent]
+pub struct Deposited {
+    pub who: Address,
+    pub amount: i128,
+}
+
+#[soroban_sdk::contract]
+pub struct Vault;
+
+#[soroban_sdk::contractimpl]
+impl Vault {
+    pub fn deposit(env: Env, who: Address, amount: i128) -> Result<i128, VaultError> {
+        who.require_auth();
+        let key = DataKey::Balance(who.clone());
+        let current: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        env.storage().persistent().set(&key, &(current + amount));
+        env.storage().persistent().extend_ttl(&key, 100, 200);
+        env.events().publish((Symbol::new(&env, "deposited"), who), amount);
+        Ok(current + amount)
+    }
+}
+`;
+  const a = analyseRustFile('contracts/vault/src/lib.rs', src);
+  assert.equal(a.contracts.length, 1, 'one contract — the qualified #[contracttype] is not one');
+
+  const vault = a.contracts[0]!;
+  assert.equal(vault.name, 'Vault');
+  assert.deepEqual(vault.functions.map((f) => f.name), ['deposit']);
+  assert.deepEqual(a.types.map((t) => t.name), ['DataKey']);
+  assert.deepEqual(a.errors.map((e) => e.name), ['VaultError']);
+  assert.deepEqual(a.errors[0]!.variants.map((v) => v.code), [1, 2]);
+  assert.deepEqual(a.events.map((e) => e.name), ['Deposited']);
+
+  const deposit = vault.functions[0]!;
+  assert.ok(deposit.storage.some((s) => s.op === 'extend_ttl' && s.key === 'DataKey::Balance(who)'));
+  assert.deepEqual(deposit.events, ['deposited']);
+});
+
+test('a client built and called in one chain still names its method', () => {
+  // The most-copied form in the official examples. Requiring a `let` binding
+  // recorded the edge with no methods at all, so a call that moves funds read
+  // exactly like a query.
+  const src = `
+use soroban_sdk::{contract, contracterror, contractimpl, Address, Env};
+
+mod treasury {
+    soroban_sdk::contractimport!(file = "../../target/wasm32v1-none/release/treasury.wasm");
+}
+mod registry {
+    soroban_sdk::contractimport!(file = "../../target/wasm32v1-none/release/registry.wasm");
+}
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub enum PayrollError {
+    NotInitialized = 1,
+}
+
+#[contract]
+pub struct Payroll;
+
+#[contractimpl]
+impl Payroll {
+    pub fn pay(env: Env, employee: Address, amount: i128) -> Result<(), PayrollError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(PayrollError::NotInitialized)?;
+        admin.require_auth();
+
+        let treasury_id: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Treasury)
+            .ok_or(PayrollError::NotInitialized)?;
+        treasury::Client::new(&env, &treasury_id).withdraw(&employee, &amount);
+        Ok(())
+    }
+
+    pub fn quote(env: Env, employee: Address) -> i128 {
+        let registry_id: Address = env.storage().instance().get(&DataKey::Registry).unwrap();
+        registry::Client::new(&env, &registry_id)
+            .try_salary_of(&employee)
+            .unwrap_or(0)
+    }
+}
+`;
+  const fns = analyseRustFile('contracts/payroll/src/lib.rs', src).contracts[0]!.functions;
+
+  const withdraw = fns.find((f) => f.name === 'pay')!.contractCalls[0]!;
+  assert.equal(withdraw.client, 'treasury');
+  assert.equal(withdraw.addressOrigin, 'storage', 'a configured treasury address');
+  assert.equal(withdraw.addressKey, 'DataKey::Treasury');
+  assert.deepEqual(withdraw.methods, ['withdraw'], 'the call that moves funds is named');
+
+  // Only the first link is the client's. `unwrap_or` is called on what the
+  // other contract returned; reporting it would invent an interface.
+  const quote = fns.find((f) => f.name === 'quote')!.contractCalls[0]!;
+  assert.deepEqual(quote.methods, ['try_salary_of']);
+});
+
+test('a folded helper access reports the file it was written in', () => {
+  // `line` is counted in the file the helper lives in. Emitted against the
+  // caller's path, a write on line 17 of balance.rs is shown as `lib.rs:17` —
+  // a citation pointing at whatever happens to sit on that line instead.
+  const helpers = collectHelpersFrom(BALANCE_RS, 'contracts/ledger/src/balance.rs');
+  assert.equal(helpers.get('transfer')!.file, 'contracts/ledger/src/balance.rs');
+  assert.ok(
+    helpers.get('transfer')!.storage.every((s) => s.file === 'contracts/ledger/src/balance.rs'),
+  );
+
+  const fns = analyseRustFile('contracts/ledger/src/lib.rs', LEDGER_RS, helpers)
+    .contracts[0]!.functions;
+
+  const write = fns
+    .find((f) => f.name === 'settle')!
+    .storage.find((s) => s.op === 'set' && s.key === 'DataKey::Balance(from)')!;
+  assert.equal(write.file, 'contracts/ledger/src/balance.rs');
+  assert.equal(
+    write.line,
+    BALANCE_RS.split('\n').findIndex((l) => l.includes('.set(&from_key')) + 1,
+    'the helper’s line, counted in the helper’s file',
+  );
+
+  // An access an entry point makes itself is in the file being analysed.
+  const own = fns.find((f) => f.name === 'total')!.storage[0]!;
+  assert.equal(own.file, 'contracts/ledger/src/lib.rs');
+  assert.equal(
+    own.line,
+    LEDGER_RS.split('\n').findIndex((l) => l.includes('DataKey::Total')) + 1,
+  );
 });

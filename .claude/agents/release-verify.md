@@ -15,7 +15,7 @@ $env:PATH = "$(Join-Path $env:USERPROFILE '.cargo\bin');$env:PATH"
 
 npm run typecheck                    # must be silent
 npm run build                        # must be silent
-npm test                             # expect 17+ passing, 0 failing
+npm test                             # expect 66+ passing, 0 failing
 
 # Clean regeneration of the demo vault
 Remove-Item -Recurse -Force demo/private-payroll/.stellar-memory -ErrorAction SilentlyContinue
@@ -36,26 +36,37 @@ cd ../..
 
 Check these specifics, not just exit codes:
 
+- **66 tests pass, 0 fail.** The suite only ever grows, so a total below the number in the command
+  above means tests were deleted — read the count, not just the exit code.
 - **3 contracts** detected: `Payroll`, `Treasury`, `EmployeeRegistry`.
-- **8 MCP tools** advertised, including `value_surface`.
+- **8 MCP tools** advertised, including `value_surface`. All eight declare `readOnlyHint`, and seven
+  declare an `outputSchema` — every one but `project_overview`, which answers with prose on purpose.
+  Those annotations are the read-only claim in a form the protocol can check, so losing one is a
+  real regression even though the tools still answer.
 - `value_surface` reports `PayrollError` with variants 1–4 and `pay` among its `raised_by`, and
   one `asset` node for the `TokenClient` in `Treasury.withdraw`.
 - `graph` shows **`Payroll calls Treasury` and `Payroll calls EmployeeRegistry`**. Losing an edge
   means cross-contract resolution regressed.
-- `resume --json` reports **exactly these seven warnings** — no more, no fewer. Read them from the
-  JSON, not the terminal, which truncates at eight:
-  1. `treasury @ testnet` runs a different build than local source
-  2. `DataKey::LastPaid(employee)` persistent, never given an `extend_ttl`
-  3. `EmployeeRegistry.initialize` authorizes only a caller-supplied parameter
-  4. `Payroll.initialize` — same
-  5. `Payroll.set_pay_token` writes state with no `require_auth` at all
-  6. `Treasury.initialize` — same as 3
-  7. every test module calls `mock_all_auths`, so access control is never exercised
+- `resume --json` reports **exactly these six source-derived warnings** — no more, no fewer. Read
+  them from the JSON, not the terminal, which truncates at eight:
+  1. `DataKey::LastPaid(employee)` persistent, never given an `extend_ttl`
+  2. `EmployeeRegistry.initialize` authorizes only a caller-supplied parameter
+  3. `Payroll.initialize` — same
+  4. `Payroll.set_pay_token` writes state with no `require_auth` at all
+  5. `Treasury.initialize` — same as 2
+  6. every test module calls `mock_all_auths`, so access control is never exercised
 
-  **Any additional warning is a false positive and is a failure**, even if the tool otherwise runs.
-  Specifically, these must never be flagged: `DataKey::Balance` and `DataKey::Salary` do extend
-  their TTLs; `balance`, `salary_of`, `last_paid` and `payroll_address` are read-only getters;
-  and a SEP-41 `transfer` calling `from.require_auth()` on its own parameter is correct code.
+  **Any additional warning in that set is a false positive and is a failure**, even if the tool
+  otherwise runs. Specifically, these must never be flagged: `DataKey::Balance` and `DataKey::Salary`
+  do extend their TTLs; `balance`, `salary_of`, `last_paid` and `payroll_address` are read-only
+  getters; and a SEP-41 `transfer` calling `from.require_auth()` on its own parameter is correct code.
+
+  **`drift` warnings are counted separately and are not fixed at a number.** A drift verdict compares
+  the deployed Wasm against whatever `target/` holds on *this* machine, and `target/` is gitignored,
+  so it depends on who last ran `cargo build` and with which toolchain. On a clean clone with no
+  build there is no local hash at all and every deployment is `unknown`, which now reads as
+  `not checked` and must never read as `in sync`. Expect the six above plus zero or more drift
+  warnings; the committed vault currently carries two, for `payroll` and `treasury`.
 - `--offline` completes with no network access and still reports the contracts.
 - The public functions the analyser reports must match the compiled Wasm spec:
   `stellar contract info interface --wasm demo/private-payroll/target/wasm32v1-none/release/payroll.wasm --output json`

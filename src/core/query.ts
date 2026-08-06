@@ -101,6 +101,24 @@ const KIND_WEIGHT: Partial<Record<NodeKind, number>> = {
   deployment: 1,
 };
 
+/**
+ * The string values inside a node's payload, without the field names.
+ *
+ * Serialising the payload put the schema into the searchable text: every
+ * `FunctionData` carried `"params"` and `"type"`, so a search for the auth shape
+ * that lets anyone claim admin returned every function in the project, getters
+ * included. A field name says what the index calls something, not what the node
+ * is about.
+ */
+function dataValues(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') out.push(value.toLowerCase());
+  else if (Array.isArray(value)) for (const item of value) dataValues(item, out);
+  else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) dataValues(item, out);
+  }
+  return out;
+}
+
 export function search(memory: ProjectMemory, query: string, limit = 20): SearchHit[] {
   const needle = query.toLowerCase().trim();
   if (!needle) return [];
@@ -115,7 +133,7 @@ export function search(memory: ProjectMemory, query: string, limit = 20): Search
     const title = node.title.toLowerCase();
     const summary = (node.summary ?? '').toLowerCase();
     const pathText = (node.path ?? '').toLowerCase();
-    const dataText = node.data ? JSON.stringify(node.data).toLowerCase() : '';
+    const dataText = node.data ? dataValues(node.data).join(' ') : '';
 
     let score = 0;
     let reason = '';
@@ -133,6 +151,17 @@ export function search(memory: ProjectMemory, query: string, limit = 20): Search
 
     for (const term of terms) {
       if (title.includes(term)) score += 12;
+      // A node names its own kind nowhere else: `DataKey::Admin (instance)` does
+      // not contain "storage", so the most obvious query for a storage key
+      // matched every function that reads one and none of the keys. The plural
+      // is how a person asks for them. Weighted above the summary and below the
+      // name, because this ranks — `search_memory`'s `kind` argument is what
+      // narrows to one kind, and a function that genuinely reads storage is
+      // still an answer here.
+      if (term === node.kind || term === `${node.kind}s`) {
+        score += 8;
+        reason ||= `kind is ${node.kind}`;
+      }
       if (summary.includes(term)) {
         score += 6;
         reason ||= 'mentioned in the summary';
@@ -295,6 +324,50 @@ export interface Signal {
   scope?: 'project';
 }
 
+export type DriftState = NonNullable<DeploymentData['drift']>;
+
+/**
+ * The one drift rule, so no surface can paint a comparison that never ran as
+ * agreement.
+ *
+ * `unknown` is a third state and not a weaker `in-sync`: it is what a deployment
+ * gets when one of the two Wasm hashes is missing — the network was not
+ * consulted, or the CLI had no answer — so nothing was compared. An absent
+ * `drift` is the same thing said by omission. Every surface used to fold both
+ * into "in sync", which claims a check nobody performed.
+ */
+export function driftState(drift: DeploymentData['drift']): DriftState {
+  return drift === 'in-sync' || drift === 'stale' ? drift : 'unknown';
+}
+
+/**
+ * The word each state is named by. Colour alone cannot carry the difference —
+ * the window already commits to that — and three surfaces naming the third state
+ * three ways is how they drifted apart the first time.
+ */
+export const DRIFT_LABEL: Record<DriftState, string> = {
+  'in-sync': 'in sync',
+  stale: 'stale',
+  unknown: 'not checked',
+};
+
+/**
+ * The one TTL rule, so the note a human reads and the gate CI runs cannot
+ * disagree about the same key.
+ *
+ * Instance entries are deliberately out. `instance().extend_ttl(threshold,
+ * extend_to)` names no key — it extends the contract instance as a whole — so
+ * the scanner has no entry to record it against and `hasTtlExtension` is false
+ * on every instance key however diligently the contract extends it. Warning
+ * there is a warning no correct code can clear. The exposure differs too: an
+ * instance entry lapses together with the contract's own code, all at once and
+ * unmissably, where a persistent entry archives on its own and leaves one value
+ * unreachable behind a contract that still answers.
+ */
+export function missingTtlExtension(data: StorageData): boolean {
+  return data.durability === 'persistent' && !data.hasTtlExtension;
+}
+
 /**
  * Facts a returning developer would want flagged, all derived from hard data
  * rather than inference: deployments that no longer match source, persistent
@@ -306,7 +379,7 @@ export function signals(memory: ProjectMemory): Signal[] {
 
   for (const node of nodesOfKind(memory, 'deployment')) {
     const data = node.data as unknown as DeploymentData | undefined;
-    if (data?.drift === 'stale') {
+    if (driftState(data?.drift) === 'stale') {
       out.push({
         severity: 'warn',
         category: 'drift',
@@ -318,7 +391,7 @@ export function signals(memory: ProjectMemory): Signal[] {
 
   for (const node of nodesOfKind(memory, 'storage')) {
     const data = node.data as unknown as StorageData | undefined;
-    if (data && data.durability === 'persistent' && !data.hasTtlExtension) {
+    if (data && missingTtlExtension(data)) {
       out.push({
         severity: 'warn',
         category: 'ttl',
@@ -545,7 +618,7 @@ export interface ResumeReport {
   firstScan: boolean;
   contracts: { title: string; functions: number; deployedOn: string[] }[];
   /** Every live contract this project is wired to, including external ones. */
-  deployments: { alias?: string; network: string; contractId: string; drift?: string; linked: boolean }[];
+  deployments: { alias?: string; network: string; contractId: string; drift: DriftState; linked: boolean }[];
   changedSinceLastScan: MemoryNode[];
   openTasks: MemoryNode[];
   signals: Signal[];
@@ -597,7 +670,7 @@ export function resumeReport(memory: ProjectMemory, nowIso: string): ResumeRepor
         alias: data?.alias,
         network: data?.network ?? 'unknown',
         contractId: data?.contractId ?? 'unknown',
-        drift: data?.drift,
+        drift: driftState(data?.drift),
         linked,
       };
     }),
@@ -649,7 +722,7 @@ export function contextDigest(memory: ProjectMemory, maxChars = 12_000): string 
       for (const d of c.deployments) {
         const data = d.data as unknown as DeploymentData | undefined;
         lines.push(
-          `Deployed on ${data?.network}: ${data?.contractId} (${data?.drift ?? 'unknown'} with local build)`,
+          `Deployed on ${data?.network}: ${data?.contractId} (drift: ${DRIFT_LABEL[driftState(data?.drift)]})`,
         );
       }
     }

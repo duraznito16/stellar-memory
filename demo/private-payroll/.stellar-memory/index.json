@@ -4,8 +4,7 @@
     "name": "private-payroll",
     "purpose": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
     "networks": [
-      "testnet",
-      "mainnet"
+      "testnet"
     ]
   },
   "nodes": [
@@ -105,8 +104,8 @@
           "line": 12
         },
         {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/employee_registry.wasm"
+          "source": "config",
+          "file": "target/wasm32v1-none/release/employee_registry.wasm"
         }
       ],
       "firstSeen": "2026-08-06T05:42:22.027Z",
@@ -377,7 +376,7 @@
           "last_paid"
         ],
         "wasmPath": "target/wasm32v1-none/release/payroll.wasm",
-        "localWasmHash": "827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c"
+        "localWasmHash": "7f0be93b08d2507d2357e6bcf4940b8aa82ca03befe47338c85193a58cd3263c"
       },
       "provenance": [
         {
@@ -386,12 +385,12 @@
           "line": 38
         },
         {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/payroll.wasm"
+          "source": "config",
+          "file": "target/wasm32v1-none/release/payroll.wasm"
         }
       ],
       "firstSeen": "2026-08-06T05:42:22.027Z",
-      "lastChanged": "2026-08-06T05:42:22.027Z"
+      "lastChanged": "2026-08-06T21:43:06.877Z"
     },
     {
       "id": "function:Payroll.initialize",
@@ -806,7 +805,7 @@
           "payroll_address"
         ],
         "wasmPath": "target/wasm32v1-none/release/treasury.wasm",
-        "localWasmHash": "eaf0965402d93d78878a9ae409f0c1996d0f967492983926cc59d60aa347873b"
+        "localWasmHash": "50a785f3b7239877f9b6c0b707afb9d2d5e985d7701a21195cae7973e058810d"
       },
       "provenance": [
         {
@@ -815,12 +814,12 @@
           "line": 24
         },
         {
-          "source": "stellar-cli",
-          "command": "stellar contract info hash --wasm target/wasm32v1-none/release/treasury.wasm"
+          "source": "config",
+          "file": "target/wasm32v1-none/release/treasury.wasm"
         }
       ],
       "firstSeen": "2026-08-06T05:42:22.027Z",
-      "lastChanged": "2026-08-06T05:42:22.027Z"
+      "lastChanged": "2026-08-06T21:43:06.877Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -1433,7 +1432,7 @@
       "provenance": [
         {
           "source": "stellar-cli",
-          "command": "stellar contract info hash --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
+          "command": "stellar contract fetch --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
           "network": "testnet"
         }
       ],
@@ -1465,13 +1464,13 @@
       "id": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
       "kind": "deployment",
       "title": "payroll @ testnet",
-      "summary": "Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.",
+      "summary": "Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU` — out of sync with local source.",
       "data": {
         "network": "testnet",
         "contractId": "CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
         "onChainWasmHash": "827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c",
         "alias": "payroll",
-        "drift": "in-sync",
+        "drift": "stale",
         "meta": {
           "rsver": "1.97.1",
           "rssdkver": "22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02"
@@ -1500,12 +1499,12 @@
       "provenance": [
         {
           "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
+          "command": "stellar contract fetch --id CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
           "network": "testnet"
         }
       ],
       "firstSeen": "2026-08-06T05:42:22.027Z",
-      "lastChanged": "2026-08-06T05:42:22.027Z"
+      "lastChanged": "2026-08-06T21:43:06.877Z"
     },
     {
       "id": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
@@ -1547,7 +1546,7 @@
       "provenance": [
         {
           "source": "stellar-cli",
-          "command": "stellar contract info hash --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
+          "command": "stellar contract fetch --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
           "network": "testnet"
         }
       ],
@@ -1560,19 +1559,19 @@
       "title": "private-payroll",
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
-        "branch": "master",
-        "head": "a79ca46f94497b9c4c85aaf72ad65ca97a7f3112",
-        "lastCommitDate": "2026-08-06T00:38:01-05:00",
-        "dirtyFiles": 134
+        "branch": "polish/bounty",
+        "head": "6afada265463e4ae76c044217bb8f23aebb77f77",
+        "lastCommitDate": "2026-08-06T17:54:12-03:00",
+        "dirtyFiles": 12
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "a79ca46f94497b9c4c85aaf72ad65ca97a7f3112"
+          "ref": "6afada265463e4ae76c044217bb8f23aebb77f77"
         }
       ],
       "firstSeen": "2026-08-06T05:42:22.027Z",
-      "lastChanged": "2026-08-06T05:42:22.027Z"
+      "lastChanged": "2026-08-06T21:43:06.877Z"
     }
   ],
   "edges": [
@@ -2422,6 +2421,7 @@
       "from": "contract:Payroll",
       "to": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
       "kind": "deployed_as",
+      "note": "deployed build is older than source",
       "provenance": [
         {
           "source": "stellar-cli",
@@ -2523,6 +2523,27 @@
         "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
         "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
         "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-06T19:08:19.261Z",
+      "commit": "e8edd633bbb012ddce3bfb6350e41d9caeb649fe",
+      "nodeCount": 55,
+      "edgeCount": 75,
+      "changed": [
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-06T21:43:06.877Z",
+      "commit": "6afada265463e4ae76c044217bb8f23aebb77f77",
+      "nodeCount": 55,
+      "edgeCount": 75,
+      "changed": [
+        "contract:Payroll",
+        "contract:Treasury",
+        "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
         "project:private-payroll"
       ]
     }

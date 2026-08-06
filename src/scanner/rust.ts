@@ -46,6 +46,17 @@ export interface StorageAccess {
    */
   key?: string;
   line: number;
+  /**
+   * The file this access was actually read from — set whenever the caller
+   * supplied a path, which `analyseRustFile` always does.
+   *
+   * `line` is counted in that file. A helper on line 87 of `balance.rs`, folded
+   * into an entry point in a 60-line `lib.rs`, was cited as `lib.rs:87` — a
+   * reference to code that is not there, which is worse than no reference at
+   * all. Anything emitting provenance for an access must prefer this over the
+   * path of the file being analysed.
+   */
+  file?: string;
 }
 
 /**
@@ -192,6 +203,11 @@ export interface HelperFn {
   clientCalls: string[];
   /** Set when the helper's whole job is to read one storage key and return it. */
   returnsStorageKey?: string;
+  /**
+   * The file the helper is defined in, when the caller supplied it. Its storage
+   * accesses carry the same path, and their line numbers are counted there.
+   */
+  file?: string;
 }
 
 /**
@@ -204,11 +220,12 @@ export interface HelperFn {
  * bringing back a false positive on correct code. Callers should gather these
  * across a crate and pass them back in.
  */
-export function collectHelpersFrom(source: string): Map<string, HelperFn> {
+export function collectHelpersFrom(source: string, rel?: string): Map<string, HelperFn> {
   const src = stripComments(source);
   return collectFreeFunctions(
     src,
     collectContractImpls(src).map((i) => [i.bodyStart, i.bodyEnd] as [number, number]),
+    rel,
   );
 }
 
@@ -226,12 +243,7 @@ export function analyseRustFile(
     errors: collectErrorEnums(src),
     events: collectAttributed(src, 'contractevent'),
     imports: collectImports(src),
-    // `#![cfg(test)]` (inner) is as common as `#[cfg(test)]` (outer) at the top
-    // of a test module, and `test.rs` / `tests.rs` are the conventional names.
-    isTest:
-      /#!?\[cfg\(test\)\]/.test(src) ||
-      /(^|\/)tests?\//.test(rel) ||
-      /(^|\/)_?tests?\.rs$/.test(rel),
+    isTest: looksLikeTestFile(src, rel),
     usesSorobanSdk: /\bsoroban_sdk\b/.test(src),
   };
 
@@ -242,6 +254,7 @@ export function analyseRustFile(
   for (const [name, helper] of collectFreeFunctions(
     src,
     impls.map((i) => [i.bodyStart, i.bodyEnd] as [number, number]),
+    rel,
   )) {
     helpers.set(name, helper);
   }
@@ -268,6 +281,7 @@ export function analyseRustFile(
         impl.bodyEnd,
         impl.traitPath !== undefined,
         helpers,
+        rel,
       ),
     );
     if (impl.traitPath) {
@@ -418,13 +432,84 @@ function matchBrace(src: string, openIndex: number): number {
 }
 
 /* ------------------------------------------------------------------ *
+ * Test detection
+ * ------------------------------------------------------------------ */
+
+/**
+ * Is this file nothing but tests?
+ *
+ * The distinction between the two spellings of the attribute decides it.
+ * `#![cfg(test)]` is an *inner* attribute: it gates everything in the file.
+ * `#[cfg(test)] mod tests { … }` is an *outer* attribute gating only that
+ * module, and putting it at the foot of a production file is the dominant
+ * convention in Rust — so treating any occurrence as "this file is a test"
+ * classified a real `balance.rs` as a test module. Its `#[contracttype]`s and
+ * `#[contracterror]`s then vanished from the graph and its production code was
+ * presented to the developer as a test.
+ *
+ * The outer form still counts when the module it gates is the entire file,
+ * which is how a test-only file that avoids the inner attribute is written.
+ */
+function looksLikeTestFile(src: string, rel: string): boolean {
+  // `tests/` and `test.rs` / `tests.rs` are the conventional locations.
+  if (/(^|\/)tests?\//.test(rel) || /(^|\/)_?tests?\.rs$/.test(rel)) return true;
+  if (/#!\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]/.test(src)) return true;
+  return testModuleSpansFile(src);
+}
+
+/**
+ * True when a `#[cfg(test)] mod … { … }` covers everything the file contains,
+ * so the outer attribute happens to gate the whole file after all.
+ */
+function testModuleSpansFile(src: string): boolean {
+  // `#[cfg(test)]` only — the `!` of the inner form is not whitespace, so the
+  // two spellings cannot be confused here.
+  const re = /#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    const after = src.slice(m.index + m[0].length);
+    // A `mod` with a body. `#[cfg(test)] mod test;` declares a *sibling file*
+    // as the test module, which says nothing about this one.
+    const mod = /^\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?mod\s+\w+\s*\{/.exec(after);
+    if (!mod) continue;
+
+    const braceOpen = m.index + m[0].length + mod[0].length - 1;
+    const end = matchBrace(src, braceOpen);
+    if (definesNothing(src.slice(0, m.index)) && definesNothing(src.slice(end))) return true;
+  }
+  return false;
+}
+
+/** Whitespace, inner attributes and imports — nothing that declares behaviour. */
+function definesNothing(text: string): boolean {
+  return !text
+    .replace(/#!\s*\[[^\]]*\]/g, ' ')
+    .replace(/\b(?:pub(?:\s*\([^)]*\))?\s+)?use\s+[^;]*;/g, ' ')
+    .replace(/\bextern\s+crate\s+[^;]*;/g, ' ')
+    .trim();
+}
+
+/* ------------------------------------------------------------------ *
  * Declaration collection
  * ------------------------------------------------------------------ */
 
+/**
+ * An optional path in front of an attribute macro. A crate that skips the
+ * prelude writes `#[soroban_sdk::contract]`, and matching only the bare name
+ * found no contract, no functions and no types in its main file — the contract
+ * disappeared from the graph without a single warning.
+ */
+const ATTR_PATH = String.raw`(?:\w+\s*::\s*)*`;
+
 function collectContractNames(src: string): NamedDecl[] {
   const out: NamedDecl[] = [];
-  // `#[contract]` exactly — not `#[contracttype]`, `#[contractimpl]`, etc.
-  const re = /#\[contract\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?struct\s+(\w+)/g;
+  // `#[contract]` exactly — not `#[contracttype]`, `#[contractimpl]`, etc. The
+  // closing bracket right after the name is what keeps those out.
+  const re = new RegExp(
+    String.raw`#\[${ATTR_PATH}contract\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?struct\s+(\w+)`,
+    'g',
+  );
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     if (m[1]) out.push({ name: m[1], line: lineAt(src, m.index) });
@@ -443,8 +528,10 @@ function collectContractNames(src: string): NamedDecl[] {
  */
 function collectErrorEnums(src: string): ErrorDecl[] {
   const out: ErrorDecl[] = [];
-  const re =
-    /#\[contracterror(?:\([^)]*\))?\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?enum\s+(\w+)/g;
+  const re = new RegExp(
+    String.raw`#\[${ATTR_PATH}contracterror(?:\([^)]*\))?\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?enum\s+(\w+)`,
+    'g',
+  );
   let m: RegExpExecArray | null;
 
   while ((m = re.exec(src)) !== null) {
@@ -506,7 +593,7 @@ function collectUpgradeableDerives(src: string): { name: string; migratable: boo
 function collectAttributed(src: string, attr: string): NamedDecl[] {
   const out: NamedDecl[] = [];
   const re = new RegExp(
-    `#\\[${attr}(?:\\([^)]*\\))?\\]\\s*(?:#\\[[^\\]]*\\]\\s*)*(?:pub(?:\\s*\\([^)]*\\))?\\s+)?(?:struct|enum)\\s+(\\w+)`,
+    String.raw`#\[${ATTR_PATH}${attr}(?:\([^)]*\))?\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\s*\([^)]*\))?\s+)?(?:struct|enum)\s+(\w+)`,
     'g',
   );
   let m: RegExpExecArray | null;
@@ -535,8 +622,10 @@ interface ImplBlock {
  */
 function collectContractImpls(src: string): ImplBlock[] {
   const out: ImplBlock[] = [];
-  const re =
-    /#\[contractimpl\]\s*(?:#\[[^\]]*\]\s*)*impl(?:\s*<[^>]*>)?\s+([\w:]+)(?:\s*<[^>]*>)?(?:\s+for\s+([\w:]+)(?:\s*<[^>]*>)?)?/g;
+  const re = new RegExp(
+    String.raw`#\[${ATTR_PATH}contractimpl\]\s*(?:#\[[^\]]*\]\s*)*impl(?:\s*<[^>]*>)?\s+([\w:]+)(?:\s*<[^>]*>)?(?:\s+for\s+([\w:]+)(?:\s*<[^>]*>)?)?`,
+    'g',
+  );
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     const brace = src.indexOf('{', m.index + m[0].length);
@@ -604,6 +693,7 @@ function enclosingModule(src: string, index: number): string | undefined {
 function collectFreeFunctions(
   src: string,
   implRanges: [number, number][],
+  file?: string,
 ): Map<string, HelperFn> {
   const out = new Map<string, HelperFn>();
   const re = /\bfn\s+(\w+)\s*(?:<[^>]*>)?\s*\(/g;
@@ -622,13 +712,16 @@ function collectFreeFunctions(
     if (src.slice(parenClose, braceOpen).includes(';')) continue;
 
     const body = src.slice(braceOpen, matchBrace(src, braceOpen));
-    const storage = parseStorage(body, lineAt(src, braceOpen));
+    // The line numbers below are counted in *this* file, which is not
+    // necessarily the file whose entry points end up folding the helper in.
+    const storage = parseStorage(body, lineAt(src, braceOpen), file);
 
     out.set(name, {
       storage,
       events: parseEvents(body),
       clientCalls: parseClientCalls(body),
       returnsStorageKey: soleStorageRead(storage),
+      file,
     });
   }
   return out;
@@ -651,6 +744,7 @@ function parseImplFunctions(
   to: number,
   isTraitImpl = false,
   helpers: Map<string, HelperFn> = new Map(),
+  file?: string,
 ): FunctionDecl[] {
   const body = src.slice(from, to);
   const out: FunctionDecl[] = [];
@@ -686,7 +780,7 @@ function parseImplFunctions(
     // that keeps its storage access in `balance.rs` — the canonical layout —
     // appears to touch no storage at all.
     const called = [...helpers.entries()].filter(([helperName]) =>
-      new RegExp(`\\b${helperName}\\s*\\(`).test(fnBody),
+      callsFreeFunction(fnBody, helperName),
     );
 
     out.push({
@@ -704,8 +798,11 @@ function parseImplFunctions(
         ...parseAuthSubjects(fnBody, params, helpers),
       ],
       guards,
+      // A folded-in access keeps the file and line it was written at. Those two
+      // travel together: reporting a helper's line against the caller's file
+      // points a reader at code that is not there.
       storage: [
-        ...parseStorage(fnBody, lineAt(src, braceOpen)),
+        ...parseStorage(fnBody, lineAt(src, braceOpen), file),
         ...called.flatMap(([, helper]) => helper.storage),
       ],
       events: [...parseEvents(fnBody), ...called.flatMap(([, helper]) => helper.events)],
@@ -721,6 +818,38 @@ function parseImplFunctions(
   }
 
   return out;
+}
+
+/**
+ * Does this body call `name` as a free function?
+ *
+ * `\b` matches after a dot, so `token::Client::new(&e, &t).transfer(&from, …)`
+ * read as a call to the free `transfer` helper of a `balance.rs`, and that
+ * helper's storage, events and client calls were folded into a function that
+ * touches none of them. With helpers named `balance`, `mint`, `get`, `set` and
+ * `transfer` — the whole vocabulary of a token — that fabricates most of a
+ * contract's storage edges, each one an assertion the tool cannot evidence.
+ *
+ * A path-qualified call is deliberately not counted either. `balance::transfer(…)`
+ * really is the helper, but `Vec::new(&env)` is indistinguishable from a call to
+ * a helper named `new`, and inventing storage access for a constructor is worse
+ * than missing a qualified call — the unqualified `use`d form is what the
+ * official examples are written in.
+ */
+function callsFreeFunction(fnBody: string, name: string): boolean {
+  // Helper names come from `(\w+)`, so there is nothing here to escape.
+  const re = new RegExp(`\\b${name}\\s*\\(`, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(fnBody)) !== null) {
+    let i = m.index - 1;
+    while (i >= 0 && /\s/.test(fnBody[i] ?? '')) i--;
+    if (fnBody[i] === '.') continue; // a method on some receiver
+    // `::` only. A single colon is a struct-literal field — `State { admin:
+    // read_admin(&e) }` really does call the helper.
+    if (fnBody[i] === ':' && fnBody[i - 1] === ':') continue;
+    return true;
+  }
+  return false;
 }
 
 function matchParen(src: string, openIndex: number): number {
@@ -783,7 +912,7 @@ function indexOfTopLevelColon(text: string): number {
   return -1;
 }
 
-function parseStorage(fnBody: string, baseLine: number): StorageAccess[] {
+function parseStorage(fnBody: string, baseLine: number, file?: string): StorageAccess[] {
   const out: StorageAccess[] = [];
   const bindings = collectLetBindings(fnBody);
   const re =
@@ -811,6 +940,7 @@ function parseStorage(fnBody: string, baseLine: number): StorageAccess[] {
       op,
       key: firstArg ? canonicaliseKey(firstArg, bindings) : undefined,
       line: baseLine + countNewlines(fnBody.slice(0, m.index)),
+      file,
     });
   }
   return out;
@@ -1038,13 +1168,22 @@ function parseContractCalls(
       }
     }
 
+    // A client is either bound to a name and used, or constructed and called on
+    // the spot. Reading only the first shape left the most-copied form in the
+    // official examples with no methods at all: the edge existed but said
+    // nothing, so a call that moves funds looked exactly like a query.
+    const binding = bindingNameAt(fnBody, m.index);
+    const methods = binding
+      ? methodsCalledOn(fnBody, binding)
+      : chainedMethodAfter(fnBody, close);
+
     out.push({
       client,
       kind,
       address: address || undefined,
       addressOrigin,
       addressKey,
-      methods: methodsCalledOn(fnBody, bindingNameAt(fnBody, m.index)),
+      methods,
       line: countNewlines(fnBody.slice(0, m.index)),
     });
   }
@@ -1098,6 +1237,25 @@ function bindingNameAt(fnBody: string, callIndex: number): string | undefined {
   const before = fnBody.slice(Math.max(0, callIndex - 200), callIndex);
   const m = /\blet\s+(?:mut\s+)?(\w+)\s*(?::\s*[^=;]+)?=\s*$/.exec(before);
   return m?.[1];
+}
+
+/**
+ * The method invoked directly on a freshly constructed client:
+ * `token::Client::new(&e, &t).transfer(&from, &to, &amount)`.
+ *
+ * Exactly one link of the chain is read. Anything past it is called on the
+ * *result* of that method, not on the client — reporting `unwrap` from
+ * `…try_balance(&who).unwrap()` as a contract method would be an invented fact
+ * about the callee's interface.
+ */
+function chainedMethodAfter(fnBody: string, afterCall: number): string[] {
+  let i = afterCall;
+  while (i < fnBody.length && /\s/.test(fnBody[i] ?? '')) i++;
+  if (fnBody[i] !== '.') return [];
+  i++;
+  while (i < fnBody.length && /\s/.test(fnBody[i] ?? '')) i++;
+  const method = /^(\w+)\s*\(/.exec(fnBody.slice(i, i + 120))?.[1];
+  return method ? [method] : [];
 }
 
 /** Methods invoked on a bound client, e.g. `client.withdraw(...)`. */

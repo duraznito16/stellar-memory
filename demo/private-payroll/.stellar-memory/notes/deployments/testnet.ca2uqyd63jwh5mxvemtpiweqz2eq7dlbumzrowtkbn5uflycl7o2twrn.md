@@ -37,7 +37,7 @@ Live at `CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN`.
 
 <details><summary>Where this came from</summary>
 
-- Reported by `stellar contract info hash --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN` on `testnet` (ground truth)
+- Reported by `stellar contract fetch --id CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN` on `testnet` (ground truth)
 
 </details>
 <!-- /stellar-memory:auto -->

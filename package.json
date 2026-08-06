@@ -42,6 +42,8 @@
     "dev": "tsc -p tsconfig.json --watch",
     "prepublishOnly": "npm run build",
     "_comment_test": "Tests are TypeScript run through Node's native type stripping, which needs Node 22.6+. What ships is compiled JavaScript and runs on Node 20.",
+    "_comment_pretest": "The MCP and window tests spawn dist/index.js, so on a clean clone the suite fails with ENOENT unless something built it first.",
+    "pretest": "npm run build",
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "mcp:call": "node scripts/mcp-call.mjs",

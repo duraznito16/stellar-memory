@@ -29,9 +29,14 @@ established by testing against stellar CLI 27.0.0 — trust these over your prio
   the network with **no Rust toolchain required**. Output is a JSON array of `SCSpecEntry`, each
   tagged `function_v0`, `event_v0`, or `udt_*`. `event_v0` carries `prefix_topics`, `params` with
   `location: topic_list | data`, and `data_format`.
+- There is **no `contract info hash` subcommand**. It was assumed for a long time and the code
+  called it for years, silently getting nothing back. `stellar contract info` offers `interface`,
+  `meta`, `env-meta` and `build`. A Wasm hash is the SHA-256 of the bytes: compute the local one
+  directly, and get the deployed one with `stellar contract fetch --id <C…> --network <net>
+  --out-file <tmp>` and hash what comes down. Check `--help` before believing any subcommand here.
 - The native asset contract (`stellar contract id asset --asset native --network testnet`) is a
-  real deployed contract useful for testing, but it has **no downloadable Wasm** — `info hash` and
-  `info meta` deliberately fail against it. Use it to exercise failure paths, not success paths.
+  real deployed contract useful for testing, but it has **no downloadable Wasm** — `contract fetch`
+  and `info meta` fail against it by design. Use it to exercise failure paths, not success paths.
 - **Unverified:** the exact JSON shape of `contract info meta`. `flattenMeta` assumes
   `sc_meta_v0: {key, val}` and falls back to recursion. Confirm against a real deployed custom
   contract before relying on it.

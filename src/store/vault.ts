@@ -11,14 +11,14 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { MemoryEdge, MemoryNode, ProjectMemory } from '../core/types.js';
 import { mergeNote, parseNote, serialiseNote } from './note.js';
-import { noteKey } from './keys.js';
+import { noteKey, registerNoteKeys } from './keys.js';
 import { renderNoteBody, renderFrontmatter } from './render.js';
 
 export const VAULT_DIR = '.stellar-memory';
 const INDEX_FILE = 'index.json';
 const NOTES_DIR = 'notes';
 
-export { noteKey, slugify, wikilink } from './keys.js';
+export { noteKey, registerNoteKeys, slugify, wikilink } from './keys.js';
 
 export function vaultPath(root: string): string {
   return path.join(root, VAULT_DIR);
@@ -66,7 +66,10 @@ export function emptyMemory(name: string, root: string): ProjectMemory {
 export async function loadMemory(root: string): Promise<ProjectMemory> {
   const file = path.join(vaultPath(root), INDEX_FILE);
   const raw = await fs.readFile(file, 'utf8');
-  const parsed = JSON.parse(raw) as ProjectMemory;
+  // A BOM is what an editor on Windows leaves behind after someone opens the
+  // index to look at it; JSON.parse refuses it, and the vault would then read as
+  // one that had never been scanned.
+  const parsed = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw) as ProjectMemory;
   if (parsed.version !== 1) {
     throw new Error(
       `This vault was written by a different version of stellar-memory (schema v${parsed.version}). ` +
@@ -75,6 +78,10 @@ export async function loadMemory(root: string): Promise<ProjectMemory> {
   }
   // The vault may have moved (cloned elsewhere); trust the caller's root.
   parsed.project.root = root;
+  // Which file a node's note lives in depends on the rest of the set, so anyone
+  // holding a memory — the MCP server, the graph, `explain` — needs the table
+  // before it can name a note or link to one.
+  registerNoteKeys(parsed.nodes);
   return parsed;
 }
 
@@ -87,17 +94,58 @@ export async function tryLoadMemory(root: string): Promise<ProjectMemory | null>
   }
 }
 
+let tempCounter = 0;
+
+/**
+ * Write by rename, so a destination only ever holds one whole file.
+ *
+ * A scan is interrupted by a Ctrl+C more often than by anything else, and the
+ * file it was halfway through is either a note — which carries the developer's
+ * own prose, the one thing here no rescan can reconstruct — or the index, which
+ * stops the vault from loading at all if it ends mid-object.
+ */
+export async function writeFileAtomic(file: string, data: string): Promise<void> {
+  // The temporary file shares a directory with its destination: rename is only
+  // atomic within one filesystem, and a vault can sit on a mount of its own.
+  const temp = path.join(
+    path.dirname(file),
+    `.${path.basename(file)}.${process.pid}-${tempCounter++}.tmp`,
+  );
+  await fs.writeFile(temp, data, 'utf8');
+  try {
+    await renameOver(temp, file);
+  } catch (error) {
+    await fs.rm(temp, { force: true });
+    throw error;
+  }
+}
+
+/**
+ * On Windows the rename fails outright while anything else holds the destination
+ * open — a search indexer, a virus scanner, Obsidian redrawing the note that
+ * just changed. All of them let go within milliseconds.
+ */
+async function renameOver(temp: string, file: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.rename(temp, file);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+      if (!transient || attempt >= 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
+}
+
 export async function saveIndex(memory: ProjectMemory): Promise<void> {
   const dir = vaultPath(memory.project.root);
   await fs.mkdir(dir, { recursive: true });
   // `root` is machine-specific; keep it out of the committed file.
   const { root: _omit, ...project } = memory.project;
   const serialisable = { ...memory, project };
-  await fs.writeFile(
-    path.join(dir, INDEX_FILE),
-    JSON.stringify(serialisable, null, 2) + '\n',
-    'utf8',
-  );
+  await writeFileAtomic(path.join(dir, INDEX_FILE), JSON.stringify(serialisable, null, 2) + '\n');
 }
 
 /**
@@ -109,6 +157,10 @@ export async function saveIndex(memory: ProjectMemory): Promise<void> {
 export async function saveNotes(
   memory: ProjectMemory,
 ): Promise<{ written: number; stale: number }> {
+  // Before anything is rendered: the links in a note are written from this
+  // table, so it has to be the same one the files are named from.
+  registerNoteKeys(memory.nodes);
+
   const byId = new Map(memory.nodes.map((n) => [n.id, n]));
   const outgoing = new Map<string, MemoryEdge[]>();
   const incoming = new Map<string, MemoryEdge[]>();
@@ -140,7 +192,7 @@ export async function saveNotes(
       incoming: incoming.get(node.id) ?? [],
       memory,
     });
-    await fs.writeFile(file, mergeNote(existing, renderFrontmatter(node), body), 'utf8');
+    await writeFileAtomic(file, mergeNote(existing, renderFrontmatter(node), body));
     written++;
   }
 
@@ -181,11 +233,7 @@ async function markStaleNotes(root: string, current: Set<string>): Promise<numbe
       `> The scan on ${now} did not find it. Your own notes below are preserved.`,
     ].join('\n');
 
-    await fs.writeFile(
-      file,
-      serialiseNote({ frontmatter, auto: notice, human: parsed.human }),
-      'utf8',
-    );
+    await writeFileAtomic(file, serialiseNote({ frontmatter, auto: notice, human: parsed.human }));
     marked++;
   }
 
@@ -208,8 +256,14 @@ async function listMarkdown(dir: string): Promise<string[]> {
   return out;
 }
 
+/**
+ * Notes first, then the index. A scan that dies in between leaves notes the
+ * index has not caught up with, which the next scan rewrites; the other order
+ * leaves an index announcing nodes whose notes were never written, and every
+ * reader of the vault believes the index.
+ */
 export async function saveMemory(memory: ProjectMemory): Promise<{ notes: number; stale: number }> {
-  await saveIndex(memory);
   const { written, stale } = await saveNotes(memory);
+  await saveIndex(memory);
   return { notes: written, stale };
 }

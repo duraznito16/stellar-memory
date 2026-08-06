@@ -17,6 +17,7 @@ import type {
   ProjectMemory,
   StorageData,
 } from '../core/types.js';
+import { DRIFT_LABEL, driftState, missingTtlExtension } from '../core/query.js';
 import { wikilink } from './keys.js';
 
 export interface RenderContext {
@@ -217,7 +218,10 @@ function renderStorage(node: MemoryNode): string {
     `- **Durability:** \`${data.durability}\``,
     `- **Key:** \`${data.key}\``,
   ];
-  if (data.durability !== 'temporary' && !data.hasTtlExtension) {
+  // The same predicate `check --fail-on ttl` gates on. The note used to warn on
+  // any durability but `temporary`, so an instance key showed a ⚠️ that CI
+  // exited 0 on: two artifacts of one index saying opposite things.
+  if (missingTtlExtension(data)) {
     lines.push(
       `- ⚠️ No \`extend_ttl\` call was found for this key. ${data.durability} entries expire once their TTL lapses, and the data becomes unreachable.`,
     );
@@ -236,12 +240,19 @@ function renderDeployment(node: MemoryNode): string {
   ];
   if (data.alias) lines.push(`- **Alias:** \`${data.alias}\``);
   if (data.onChainWasmHash) lines.push(`- **Deployed Wasm hash:** \`${data.onChainWasmHash}\``);
-  if (data.drift === 'stale') {
+  // Silence used to stand for the unchecked state, which a reader takes for "no
+  // news", and the same node read "in sync" on the graph at the same time.
+  const state = driftState(data.drift);
+  if (state === 'stale') {
     lines.push(
       '- ⚠️ **Drift:** the Wasm deployed here does not match your local build. What runs on this network is older than your source.',
     );
-  } else if (data.drift === 'in-sync') {
+  } else if (state === 'in-sync') {
     lines.push('- ✅ **Drift:** deployed Wasm matches the local build.');
+  } else {
+    lines.push(
+      `- **Drift:** ${DRIFT_LABEL.unknown} — the deployed Wasm was never compared with a local build, so whether they agree is unknown.`,
+    );
   }
   if (data.meta && Object.keys(data.meta).length > 0) {
     lines.push('', '### Build metadata', '');

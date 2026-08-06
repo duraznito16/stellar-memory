@@ -18,8 +18,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as http from 'node:http';
 import * as net from 'node:net';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { readFileSync } from 'node:fs';
+import * as vm from 'node:vm';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -105,12 +108,126 @@ test('the live client arrives only when it is asked for', () => {
   assert.ok(!renderGraphHtml(memory, []).includes('EventSource'));
 });
 
+test('the same memory produces the same bytes, whatever the host', () => {
+  // The file is committed beside the vault it describes, so a second render of
+  // an unchanged project has to be a zero-line diff. Everything here is seeded
+  // or rounded except the order of the table, which until this test compared
+  // strings with the runtime's locale — ICU plus LANG — and put a row in a
+  // different place on a machine configured in Swedish or Turkish.
+  const memory = fixture();
+  assert.equal(renderGraphHtml(memory, []), renderGraphHtml(memory, []));
+
+  const named = fixture();
+  named.nodes = [
+    { ...named.nodes[0]!, id: 'storage:z', kind: 'storage', title: 'Zebra' },
+    { ...named.nodes[0]!, id: 'storage:o', kind: 'storage', title: 'Ödeme' },
+    { ...named.nodes[0]!, id: 'storage:a', kind: 'storage', title: 'Ahorro-Año' },
+    { ...named.nodes[0]!, id: 'storage:b', kind: 'storage', title: 'Ahorro-Ano' },
+  ];
+  named.edges = [];
+
+  // Code units, so `Ö` (U+00D6) follows `Z` and `ñ` follows `n` on every
+  // machine. A collator would put both the other way round, and which way round
+  // would depend on where the process is running.
+  const titles = [...renderGraphHtml(named, []).matchAll(/<tr><td>([^<]*)<\/td>/g)].map((m) => m[1]);
+  assert.deepEqual(titles, ['Ahorro-Ano', 'Ahorro-Año', 'Zebra', 'Ödeme']);
+});
+
 test('both pages carry a content security policy', () => {
   // The header `ui` sends only protects the served copy. The written file is
   // opened over file://, where a policy has to travel inside the document.
   for (const html of [renderGraphHtml(fixture(), []), renderGraphHtml(fixture(), [], { live: { stamp: 'x' } })]) {
     assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none';/);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * A workspace big enough to stall the server
+ * ------------------------------------------------------------------ */
+
+type Node = ProjectMemory['nodes'][number];
+
+/**
+ * Twenty contracts with the parts twenty contracts have.
+ *
+ * The layout is all-pairs over 420 iterations, so this shape — about 2100
+ * drawable nodes — is the one that used to take the better part of a minute
+ * inside a synchronous render, with `ui` answering nothing for the duration.
+ */
+function workspace(): ProjectMemory {
+  const stamp = '2026-01-01T00:00:00.000Z';
+  const nodes: Node[] = [];
+  const edges: ProjectMemory['edges'] = [];
+
+  const add = (id: string, kind: Node['kind'], title: string, owner?: string): void => {
+    nodes.push({
+      id,
+      kind,
+      title,
+      path: `contracts/${title}/src/lib.rs`,
+      provenance: [],
+      firstSeen: stamp,
+      lastChanged: stamp,
+    });
+    if (owner) edges.push({ from: owner, to: id, kind: 'defines', provenance: [] });
+  };
+
+  for (let c = 0; c < 20; c++) {
+    const contract = `contract:C${c}`;
+    add(contract, 'contract', `C${c}`);
+    add(`deployment:C${c}.testnet`, 'deployment', `C${c} on testnet`, contract);
+    for (let i = 0; i < 60; i++) add(`function:C${c}.f${i}`, 'function', `f${i}`, contract);
+    for (let i = 0; i < 25; i++) add(`storage:C${c}.k${i}`, 'storage', `DataKey::K${i}`, contract);
+    for (let i = 0; i < 10; i++) add(`event:C${c}.e${i}`, 'event', `e${i}`, contract);
+    for (let i = 0; i < 4; i++) add(`error:C${c}.x${i}`, 'error', `x${i}`, contract);
+    for (let i = 0; i < 6; i++) add(`test:C${c}.t${i}`, 'test', `t${i}`, contract);
+  }
+
+  return {
+    version: 1,
+    project: { name: 'workspace', root: '/tmp/workspace', networks: ['testnet'] },
+    nodes,
+    edges,
+    scans: [{ at: stamp, nodeCount: nodes.length, edgeCount: edges.length, changed: [] }],
+  };
+}
+
+test('a workspace too large to draw is trimmed, and says so', () => {
+  const memory = workspace();
+  // A function is in the group the trim drops, so this is the one that has to
+  // survive it: a warning the header counts and the picture cannot show is the
+  // failure this whole tool exists to prevent.
+  const found: Signal[] = [
+    { severity: 'warn', category: 'ttl', message: 'a persistent key is never extended', nodeId: 'function:C19.f59' },
+    { severity: 'info', category: 'tests', message: 'No tests reference f0.', nodeId: 'function:C0.f0' },
+  ];
+
+  const started = Date.now();
+  const html = renderGraphHtml(memory, found);
+  const took = Date.now() - started;
+
+  const drawn = (html.match(/<g class="node /g) ?? []).length;
+  const elements = (html.match(/<tr><td>/g) ?? []).length;
+  assert.equal(elements, 2140, 'every element is still in the table');
+  assert.ok(drawn <= 300, `the drawing is capped, found ${drawn}`);
+  // Unbounded this is 9.6e8 pair evaluations and 18 seconds, during which `ui`
+  // renders synchronously and dispatches no event to an open window.
+  assert.ok(took < 10_000, `the layout has to stay interactive, took ${took}ms`);
+
+  assert.match(html, new RegExp(`<p class="trimmed">Drawing ${drawn} of 2140 elements`), 'a trimmed graph says so');
+  for (const id of ['function:C19.f59', 'function:C0.f0']) {
+    assert.ok(html.includes(`data-id="${id}"`), `${id} carries a finding and must stay on the graph`);
+  }
+  assert.equal(
+    (html.match(/class="ring ring--warn"/g) ?? []).length,
+    1,
+    'the ring the header counts is drawn',
+  );
+
+  // Still the same picture twice: the filter keeps memory order and the sort
+  // that puts findings first is stable.
+  assert.equal(renderGraphHtml(memory, found), html);
+  assert.ok(!renderGraphHtml(fixture(), []).includes('class="trimmed"'), 'and a small project is untouched');
 });
 
 /* ------------------------------------------------------------------ *
@@ -150,6 +267,195 @@ test('every value the panel writes as markup is escaped', () => {
   }
 });
 
+test('a severity cannot break out of the class attribute it is written into', () => {
+  // Severity is the one field that lands inside a class rather than in text,
+  // and a quote there ends the attribute — which `esc()` would let through,
+  // because escaping text and escaping an attribute value are not the same
+  // question. Nothing produces a third severity today; the page does not depend
+  // on that staying true, and this is what says so.
+  const hostile: Signal[] = [
+    { severity: '"><img src=x onerror=alert(1)>' as 'warn', category: 'ttl', message: 'a message', scope: 'project' },
+  ];
+
+  for (const html of [renderGraphHtml(fixture(), hostile), renderGraphHtml(fixture(), hostile, { live: { stamp: 'x' } })]) {
+    assert.ok(!html.includes('<img src=x'), 'no raw markup arrives through a severity');
+    assert.equal((html.match(/<\/script>/g) ?? []).length, 1, 'exactly one script element');
+    assert.ok(html.includes('class="finding finding--info"'), 'and an unknown severity reads as the quieter of the two');
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * The page's own script, run
+ *
+ * What a class list says after a click is not in the markup the server wrote,
+ * so it cannot be asserted from the HTML — and a node left outlined under a
+ * drawing that no longer highlights it is exactly the kind of thing nobody
+ * notices until they are presenting.
+ * ------------------------------------------------------------------ */
+
+interface Fake {
+  dataset: Record<string, string>;
+  classList: { add(c: string): void; remove(c: string): void; contains(c: string): boolean };
+  addEventListener(type: string, fn: (event: unknown) => void): void;
+  fire(type: string, event?: Record<string, unknown>): void;
+  closest(selector: string): Fake | null;
+  scrollIntoView(): void;
+  appendChild(child: Fake): void;
+  innerHTML: string;
+  textContent: string;
+  className: string;
+  style: Record<string, string>;
+}
+
+/** `.node`, `.finding[data-id]`, `.node[data-id="x"]` — all the page ever asks for. */
+function matches(el: Fake, selector: string): boolean {
+  const parts = selector.match(/\.[\w-]+|\[[^\]]+\]/g) ?? [];
+  return parts.every((part) => {
+    if (part.startsWith('.')) return el.classList.contains(part.slice(1));
+    const found = /^\[data-([\w-]+)(?:="(.*)")?\]$/.exec(part);
+    if (!found) return false;
+    const held = el.dataset[found[1]!];
+    // CSS.escape put backslashes in; the id on the element never had them.
+    return held !== undefined && (found[2] === undefined || held === found[2].replace(/\\(.)/g, '$1'));
+  });
+}
+
+function element(classes: string, dataset: Record<string, string> = {}): Fake {
+  const held = new Set(classes.split(' ').filter(Boolean));
+  const handlers = new Map<string, ((event: unknown) => void)[]>();
+  const el: Fake = {
+    dataset,
+    classList: { add: (c) => void held.add(c), remove: (c) => void held.delete(c), contains: (c) => held.has(c) },
+    addEventListener: (type, fn) => void handlers.set(type, [...(handlers.get(type) ?? []), fn]),
+    fire: (type, event) => {
+      for (const fn of handlers.get(type) ?? []) fn({ target: el, currentTarget: el, preventDefault() {}, ...event });
+    },
+    closest: (selector) => (matches(el, selector) ? el : null),
+    scrollIntoView: () => undefined,
+    appendChild: () => undefined,
+    innerHTML: '',
+    textContent: '',
+    className: '',
+    style: {},
+  };
+  return el;
+}
+
+/**
+ * Build the DOM out of the rendered markup, then run the page's script over it.
+ *
+ * Out of the markup rather than out of the fixture, deliberately: a node the
+ * renderer stopped drawing has to stop being clickable here too.
+ */
+function open(html: string): {
+  node: (id: string) => Fake;
+  finding: (index: number) => Fake;
+  svg: Fake;
+  panel: Fake;
+  press: (key: string) => void;
+} {
+  const nodes = [...html.matchAll(/<g class="(node[^"]*)"[^>]*data-id="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { id: m[2]! }),
+  );
+  const edges = [...html.matchAll(/<line class="(edge[^"]*)" data-from="([^"]*)" data-to="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { from: m[2]!, to: m[3]! }),
+  );
+  const findings = [...html.matchAll(/class="(finding[^"]*)" data-id="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { id: m[2]! }),
+  );
+
+  const svg = element('graph');
+  const panel = element('panel');
+  const body = element('live', { warnings: html.match(/data-warnings="(\d+)"/)?.[1] ?? '0' });
+  const inSvg = [...nodes, ...edges];
+  const everything = [...inSvg, ...findings, panel, body];
+  const keys: ((event: unknown) => void)[] = [];
+
+  const document = {
+    title: 'fixture',
+    body,
+    getElementById: (id: string) => (id === 'panel' ? panel : null),
+    // The only tag selector the page uses.
+    querySelector: (s: string) => (s === 'svg' ? svg : everything.find((el) => matches(el, s)) ?? null),
+    querySelectorAll: (s: string) => everything.filter((el) => matches(el, s)),
+    createElement: () => element(''),
+    addEventListener: (_type: string, fn: (event: unknown) => void) => void keys.push(fn),
+  };
+  Object.assign(svg, {
+    querySelector: (s: string) => inSvg.find((el) => matches(el, s)) ?? null,
+    querySelectorAll: (s: string) => inSvg.filter((el) => matches(el, s)),
+  });
+
+  const store = new Map<string, string>();
+  const context = vm.createContext({
+    document,
+    CSS: { escape: (s: string) => s.replace(/[^\w-]/g, (c) => '\\' + c) },
+    sessionStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    },
+    // The reload client must not reach for a socket that is not there.
+    EventSource: class {
+      readyState = 0;
+      addEventListener(): void {}
+      close(): void {}
+    },
+    location: { reload: () => undefined },
+  });
+  vm.runInContext(html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>')), context);
+
+  return {
+    node: (id) => nodes.find((el) => el.dataset['id'] === id)!,
+    finding: (index) => findings[index]!,
+    svg,
+    panel,
+    press: (key) => {
+      for (const fn of keys) fn({ key, preventDefault() {} });
+    },
+  };
+}
+
+test('Escape leaves nothing behind claiming to be selected', () => {
+  const page = open(renderGraphHtml(fixture(), [], { live: { stamp: 'x' } }));
+  const node = page.node('storage:Payroll.Admin');
+
+  node.fire('click');
+  assert.ok(node.classList.contains('is-selected'), 'a click selects');
+  assert.ok(page.svg.classList.contains('is-focused'));
+  assert.ok(page.panel.innerHTML.includes('DataKey::Admin'), 'and the panel says which one');
+
+  page.press('Escape');
+  assert.ok(!page.svg.classList.contains('is-focused'), 'the graph comes back');
+  assert.ok(!node.classList.contains('is-selected'), 'and the thick outline goes with it');
+
+  // Clicking off a node is the other way out of the same state.
+  node.fire('click');
+  page.svg.fire('click', { target: page.svg });
+  assert.ok(!node.classList.contains('is-selected'));
+});
+
+test('the findings list never highlights a row the graph is not showing', () => {
+  const found: Signal[] = [
+    { severity: 'warn', category: 'ttl', message: 'a persistent key is never extended', nodeId: 'storage:Payroll.Admin' },
+    { severity: 'info', category: 'tests', message: 'No tests reference Payroll.', nodeId: 'contract:Payroll' },
+  ];
+  const page = open(renderGraphHtml(fixture(), found, { live: { stamp: 'x' } }));
+
+  page.finding(0).fire('click');
+  assert.ok(page.finding(0).classList.contains('is-active'));
+  assert.ok(page.node('storage:Payroll.Admin').classList.contains('is-selected'));
+
+  page.finding(1).fire('click');
+  assert.ok(!page.finding(0).classList.contains('is-active'), 'one row at a time');
+  assert.ok(!page.node('storage:Payroll.Admin').classList.contains('is-selected'), 'and one node at a time');
+  assert.ok(page.finding(1).classList.contains('is-active'));
+  assert.ok(page.node('contract:Payroll').classList.contains('is-selected'));
+
+  page.press('Escape');
+  assert.ok(!page.finding(1).classList.contains('is-active'), 'Escape puts the list back too');
+  assert.ok(!page.node('contract:Payroll').classList.contains('is-selected'));
+});
+
 /* ------------------------------------------------------------------ *
  * The findings panel says what it shows
  * ------------------------------------------------------------------ */
@@ -160,15 +466,18 @@ test('the findings heading counts the rows printed beneath it', () => {
     { severity: 'info', category: 'tests', message: 'No tests reference Payroll.', nodeId: 'contract:Payroll' },
     { severity: 'warn', category: 'tests', message: 'mock_all_auths everywhere', scope: 'project' },
   ];
-  const html = renderGraphHtml(fixture(), mixed, { live: { stamp: 'x' } });
-
-  const heading = html.match(/Worth knowing <span class="count">(\d+)<\/span>/);
-  const rows = (html.match(/<button type="button" class="finding /g) ?? []).length;
-  assert.equal(rows, mixed.length, 'every finding is listed');
-  assert.equal(Number(heading?.[1]), rows, 'the number and the list describe the same set');
+  // Both pages, since the written file lists them too: the heading counting one
+  // set while the list beneath it shows another is the same misstatement in
+  // either copy.
+  for (const html of [renderGraphHtml(fixture(), mixed, { live: { stamp: 'x' } }), renderGraphHtml(fixture(), mixed)]) {
+    const heading = html.match(/Worth knowing <span class="count">(\d+)<\/span>/);
+    const rows = (html.match(/<button type="button" class="finding /g) ?? []).length;
+    assert.equal(rows, mixed.length, 'every finding is listed');
+    assert.equal(Number(heading?.[1]), rows, 'the number and the list describe the same set');
+  }
 });
 
-test('a project-wide finding appears in the file that has no findings list', () => {
+test('a finding that belongs to no element is still on the page', () => {
   // It carries no nodeId, so it draws no ring and fills no table row. Counting
   // it in the header and then showing it nowhere is the failure this whole tool
   // exists to avoid.
@@ -179,15 +488,34 @@ test('a project-wide finding appears in the file that has no findings list', () 
 
   assert.match(file, /stat--warn"><b>1<\/b>/, 'the header counts it');
   assert.ok(file.includes('Every test module calls mock_all_auths.'), 'and the page can substantiate the count');
-  assert.ok(
-    !renderGraphHtml(fixture(), []).includes('<section class="project-findings">'),
-    'and the block is absent when there is nothing project-wide to put in it',
-  );
+  assert.ok(file.includes('project-wide'), 'and says it belongs to the project rather than to a node');
 });
 
-test('the demo renders the same finding count it can show', () => {
-  // The real vault, in the shape a reader will see it: every warning the header
-  // claims has either a ring on the graph or a line in the project block.
+test('a project with nothing wrong says so, rather than showing an empty list', () => {
+  // The absence of findings and the absence of checking look identical if the
+  // page just prints nothing, and only one of them is good news.
+  const quiet = renderGraphHtml(fixture(), []);
+
+  assert.match(quiet, /stat--warn"><b>0<\/b>/);
+  assert.ok(quiet.includes('Nothing needs attention.'), 'the page says it found nothing');
+  assert.ok(quiet.includes('class="all-clear"'), 'and marks it as a state rather than a finding');
+  assert.ok(!quiet.includes('class="grade grade--warn"'), 'with no severity heading over an empty list');
+  // Zero is not an alarm, so it does not wear the accent reserved for one.
+  assert.ok(quiet.includes('class="stat stat--none stat--warn"'));
+});
+
+/** The page's own escaping, so a message can be looked for as it is printed. */
+function asPrinted(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+test('the demo page shows every finding it counts', () => {
+  // The real vault, in the shape a reader will see it. This used to reconcile
+  // two partial views — a ring for the findings that owned a node, a block for
+  // the one that did not — because the written file listed nothing. It lists
+  // everything now, so the header's number and the list are the same set, and
+  // the assertion is the stronger one: not "visible somewhere" but "written
+  // out, in words, where a reader will be looking".
   const memory = JSON.parse(
     readFileSync(path.join(demo, '.stellar-memory', 'index.json'), 'utf8'),
   ) as ProjectMemory;
@@ -195,10 +523,47 @@ test('the demo renders the same finding count it can show', () => {
   const html = renderGraphHtml(memory, found);
 
   const claimed = Number(html.match(/stat--warn"><b>(\d+)<\/b>/)?.[1]);
-  const rings = (html.match(/class="ring ring--warn"/g) ?? []).length;
-  const wide = (html.match(/class="finding finding--warn"/g) ?? []).length;
   assert.equal(claimed, found.filter((s) => s.severity === 'warn').length);
-  assert.equal(rings + wide, claimed, 'every warning the header counts is visible somewhere on the page');
+
+  const listed = (html.match(/class="finding finding--warn"/g) ?? []).length;
+  assert.equal(listed, claimed, 'every warning the header counts is a row on the page');
+
+  for (const signal of found) {
+    assert.ok(html.includes(asPrinted(signal.message)), `the page says: ${signal.message}`);
+  }
+
+  // And the drawing still points at the ones that belong to something it drew.
+  const owners = new Set(
+    found.filter((s) => s.severity === 'warn' && s.scope !== 'project' && s.nodeId).map((s) => s.nodeId),
+  );
+  const rings = (html.match(/class="ring ring--warn"/g) ?? []).length;
+  assert.equal(rings, owners.size, 'and every element carrying one is ringed');
+});
+
+test('the findings are readable with scripting turned off', () => {
+  // The panel needs a script and always did. The findings must not: the file is
+  // opened over file:// by people with scripting disabled, printed to PDF, and
+  // pasted into review tools that strip <script> outright. A message that only
+  // exists inside the data island is a message that page cannot show.
+  const found: Signal[] = [
+    { severity: 'warn', category: 'ttl', message: 'a persistent key is never extended', nodeId: 'storage:Payroll.Admin' },
+    { severity: 'info', category: 'tests', message: 'No tests reference Payroll.', nodeId: 'contract:Payroll' },
+    { severity: 'warn', category: 'tests', message: 'mock_all_auths everywhere', scope: 'project' },
+  ];
+
+  for (const html of [renderGraphHtml(fixture(), found), renderGraphHtml(fixture(), found, { live: { stamp: 'x' } })]) {
+    const markup = html.slice(0, html.indexOf('<script>'));
+    for (const signal of found) {
+      assert.ok(markup.includes(asPrinted(signal.message)), `${signal.message} is in the markup, not only the island`);
+    }
+    // Severity is not carried by a colour a script paints on later: it is two
+    // headings, in a fixed order, in the document as written.
+    assert.ok(markup.includes('class="grade grade--warn">Needs attention'), 'the warnings are under a heading that says so');
+    assert.ok(
+      markup.indexOf('grade--warn') < markup.indexOf('grade--note'),
+      'and the ones that need attention come first',
+    );
+  }
 });
 
 /* ------------------------------------------------------------------ *
@@ -450,6 +815,41 @@ async function cli(...args: string[]): Promise<{ code: number; output: string }>
     return { code: e.code ?? -1, output: (e.stdout ?? '') + (e.stderr ?? '') };
   }
 }
+
+test('`graph --format html` and `ui --once` write the same bytes', async () => {
+  // The README says the two are md5-identical and that a test enforces it. No
+  // test did. They are identical for a structural reason — neither passes a
+  // render option, so neither can acquire the live client — and a structural
+  // reason is exactly the kind that survives until somebody adds an argument to
+  // one call site. Both commands write to the same default destination, so this
+  // runs them in a scratch copy of the vault rather than in the repository.
+  const scratch = mkdtempSync(path.join(os.tmpdir(), 'stellar-memory-page-'));
+  try {
+    mkdirSync(path.join(scratch, '.stellar-memory'));
+    copyFileSync(
+      path.join(demo, '.stellar-memory', 'index.json'),
+      path.join(scratch, '.stellar-memory', 'index.json'),
+    );
+    const written = path.join(scratch, 'stellar-memory-graph.html');
+    const md5 = (): string => createHash('md5').update(readFileSync(written)).digest('hex');
+
+    const drawn = await execFileAsync(process.execPath, [entry, '--cwd', scratch, 'graph', '--format', 'html'], {
+      timeout: 60_000,
+    });
+    const fromGraph = md5();
+
+    await execFileAsync(process.execPath, [entry, '--cwd', scratch, 'ui', '--once', '--no-open'], { timeout: 60_000 });
+    assert.equal(md5(), fromGraph, '`ui --once` writes the file `graph --format html` writes');
+
+    // And the same command twice is the zero-line diff the vault beside it gets.
+    await execFileAsync(process.execPath, [entry, '--cwd', scratch, 'graph', '--format', 'html'], { timeout: 60_000 });
+    assert.equal(md5(), fromGraph, 'and a second run of either changes nothing');
+
+    assert.ok(!(drawn.stdout + drawn.stderr).includes('EventSource'));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
 
 test('a port that is not a port fails before anything binds', async () => {
   for (const bad of ['abc', '-1', '70000', '1.5']) {

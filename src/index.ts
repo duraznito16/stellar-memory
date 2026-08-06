@@ -28,7 +28,7 @@ program
       'and answers questions about it — for you and for your agents.',
   )
   .version(VERSION)
-  .option('-C, --cwd <dir>', 'run as if started in <dir>', process.cwd());
+  .option('-C, --cwd <dir>', 'run as if started in <dir>');
 
 program
   .command('init')
@@ -36,7 +36,7 @@ program
   .option('--name <name>', 'project name (defaults to the directory name)')
   .option('--force', 'overwrite an existing vault', false)
   .option('--with-agents', 'also scaffold a team of AI agents wired to this project', false)
-  .action(async (opts) => runInit({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runInit({ ...globals(command), ...opts }));
 
 program
   .command('scan')
@@ -44,21 +44,21 @@ program
   .option('--offline', 'skip every network and CLI call', false)
   .option('-n, --network <name...>', 'networks to check for deployments', ['testnet', 'mainnet'])
   .option('-q, --quiet', 'suppress progress output', false)
-  .action(async (opts) => runScan({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runScan({ ...globals(command), ...opts }));
 
 program
   .command('resume')
   .description('recover context: what this project is, and what moved while you were away')
   .option('--json', 'emit the report as JSON', false)
-  .action(async (opts) => runResume({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runResume({ ...globals(command), ...opts }));
 
 program
   .command('explain [question...]')
   .description('ask about the project; without a question, print an overview')
   .option('--ai', 'use the AI layer for a prose answer (needs ANTHROPIC_API_KEY)', false)
   .option('--json', 'emit structured results as JSON', false)
-  .action(async (question: string[], opts) =>
-    runExplain({ ...globals(), ...opts, question: question.join(' ') }),
+  .action(async (question: string[], opts, command: Command) =>
+    runExplain({ ...globals(command), ...opts, question: question.join(' ') }),
   );
 
 program
@@ -67,7 +67,7 @@ program
   .option('-f, --format <format>', 'tree | mermaid | dot | json | html', 'tree')
   .option('-o, --out <file>', 'write to a file instead of stdout')
   .option('--focus <id>', 'centre the graph on one node')
-  .action(async (opts) => runGraph({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runGraph({ ...globals(command), ...opts }));
 
 program
   .command('ui')
@@ -76,7 +76,7 @@ program
   .option('--no-open', 'print the address without opening a window')
   .option('--watch', 're-scan offline when a Rust source changes', false)
   .option('--once', 'write the self-contained file and open that, with no server', false)
-  .action(async (opts) => runUi({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runUi({ ...globals(command), ...opts }));
 
 program
   .command('check')
@@ -88,15 +88,26 @@ program
   )
   .option('--all', 'also consider informational findings', false)
   .option('--json', 'emit the result as JSON', false)
-  .action(async (opts) => runCheck({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runCheck({ ...globals(command), ...opts }));
 
 program
   .command('mcp')
   .description('serve the memory to AI agents over MCP (stdio)')
-  .action(async (opts) => runMcp({ ...globals(), ...opts }));
+  .action(async (opts, command: Command) => runMcp({ ...globals(command), ...opts }));
 
-function globals(): { cwd: string } {
-  const opts = program.opts<{ cwd: string }>();
+// Declared here as well as on `program`. The parser already lifts a parent
+// option out of anywhere in the argv, but only the command that declares one
+// lists it in its own `--help` — and `--cwd` is the flag the README wires an
+// MCP server with, so `scan --help` is where someone will go looking for it.
+for (const command of program.commands) {
+  command.option('-C, --cwd <dir>', 'run as if started in <dir>');
+}
+
+function globals(command: Command): { cwd: string } {
+  // In optsWithGlobals the outer command wins, which is why the one on
+  // `program` carries no default: it would beat a `-C` typed after the
+  // subcommand and silently run in the wrong directory.
+  const opts = command.optsWithGlobals<{ cwd?: string }>();
   return { cwd: opts.cwd ?? process.cwd() };
 }
 
