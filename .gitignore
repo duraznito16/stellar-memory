@@ -12,3 +12,8 @@ demo/vendor/
 
 # The memory vault of THIS repo (a scanned project commits its own .stellar-memory/)
 .stellar-memory/cache/
+
+# Generated graph exports
+stellar-memory-graph.html
+graph.mmd
+graph.dot

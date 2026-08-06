@@ -1,13 +1,17 @@
+import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { tryLoadMemory } from '../store/vault.js';
-import { architecture, neighbourhood, nodesOfKind, search } from '../core/query.js';
+import { architecture, neighbourhood, nodesOfKind, search, signals } from '../core/query.js';
+import { renderGraphHtml } from '../store/html.js';
 import type { DeploymentData, MemoryNode, ProjectMemory } from '../core/types.js';
-import { out, warn, dim, bold, cyan, green, yellow, heading } from '../ui/out.js';
+import { out, note, success, warn, dim, bold, cyan, green, yellow, heading } from '../ui/out.js';
 
 export interface GraphOptions {
   cwd: string;
   format?: string;
   focus?: string;
+  /** Write to this file instead of stdout. */
+  out?: string;
 }
 
 export async function runGraph(options: GraphOptions): Promise<void> {
@@ -24,15 +28,34 @@ export async function runGraph(options: GraphOptions): Promise<void> {
     return;
   }
 
-  switch ((options.format ?? 'tree').toLowerCase()) {
+  const format = (options.format ?? 'tree').toLowerCase();
+
+  // A file is the natural destination for a whole page; stdout is for the text
+  // formats you pipe somewhere.
+  const emit = async (body: string, defaultName: string) => {
+    const target = options.out ?? (format === 'html' ? defaultName : undefined);
+    if (!target) {
+      out(body);
+      return;
+    }
+    const file = path.resolve(root, target);
+    await fs.writeFile(file, body, 'utf8');
+    success(`Wrote ${bold(path.relative(root, file) || file)}`);
+    note(dim('  Open it in a browser — it needs no server and no network.'));
+  };
+
+  switch (format) {
     case 'mermaid':
-      out(renderMermaid(memory));
+      await emit(renderMermaid(memory), 'graph.mmd');
       return;
     case 'dot':
-      out(renderDot(memory));
+      await emit(renderDot(memory), 'graph.dot');
       return;
     case 'json':
-      out(JSON.stringify({ nodes: memory.nodes, edges: memory.edges }, null, 2));
+      await emit(JSON.stringify({ nodes: memory.nodes, edges: memory.edges }, null, 2), 'graph.json');
+      return;
+    case 'html':
+      await emit(renderGraphHtml(memory, signals(memory)), 'stellar-memory-graph.html');
       return;
     default:
       renderTree(memory);

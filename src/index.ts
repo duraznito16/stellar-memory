@@ -62,7 +62,8 @@ program
 program
   .command('graph')
   .description('show how the project fits together')
-  .option('-f, --format <format>', 'tree | mermaid | dot | json', 'tree')
+  .option('-f, --format <format>', 'tree | mermaid | dot | json | html', 'tree')
+  .option('-o, --out <file>', 'write to a file instead of stdout')
   .option('--focus <id>', 'centre the graph on one node')
   .action(async (opts) => runGraph({ ...globals(), ...opts }));
 

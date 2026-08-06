@@ -132,6 +132,22 @@ archivist is the one that makes the vault compound: without someone recording
 *why*, the human half of every note stays empty and the memory only ever
 regenerates rather than accumulates.
 
+## See it
+
+```bash
+stellar memory graph --format html
+```
+
+Writes one self-contained HTML file — no server, no build, no network — showing
+the contracts, what they call, the storage they touch, and what is live on
+chain. Click any node for its source location, its relationships, and any
+findings against it. Nodes with something worth knowing carry a ring, and the
+panel says what it is; colour never carries the meaning on its own.
+
+It is deterministic: the same memory produces the same file, so it diffs in git
+next to the vault it describes, and it can be committed or attached to a pull
+request.
+
 ## The vault is a folder of Markdown
 
 `scan` writes `.stellar-memory/`: an `index.json` for tooling, and one Markdown
@@ -177,7 +193,7 @@ full source-level memory, just not the on-chain half.
 | `scan` | Analyse the repo and update the memory. Creates the vault if there isn't one. `--offline` skips all network and CLI calls |
 | `resume` | Recover context: what this is, what moved, what is pending |
 | `explain [question]` | Ask about the project. `--ai` for a written answer |
-| `graph` | Show how it fits together — `tree`, `mermaid`, `dot`, or `json` |
+| `graph` | Show how it fits together — `tree`, `mermaid`, `dot`, `json`, or `html` |
 | `check` | Exit non-zero when the project has blocking issues. For CI |
 | `mcp` | Serve the memory to agents over MCP (stdio) |
 | `init` | Create the vault explicitly. `--with-agents` also scaffolds the agent team |
