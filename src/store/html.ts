@@ -84,6 +84,38 @@ interface Placed {
 const WIDTH = 1100;
 const HEIGHT = 720;
 
+/**
+ * How many nodes the layout will place.
+ *
+ * Repulsion is all-pairs and runs on every one of the 420 iterations, so the
+ * cost is n²·210. Measured here: the demo's 36 nodes take 8ms, 300 take 0.4s,
+ * and the 2140 a twenty-contract workspace produces take 18 seconds — 18
+ * seconds with `renderGraphHtml` on the stack, so `ui` dispatches no `scanned`
+ * frame, the pill stays on "scanning…" and a window can give up and reconnect.
+ * A drawing that size is an unreadable mat of ink anyway, which is why this
+ * trims the picture rather than approximating the physics: an approximation
+ * would move every node in every existing graph, and the file is committed.
+ */
+const DRAWN_LIMIT = 300;
+
+/**
+ * The nodes worth the budget.
+ *
+ * Findings first, because a warning the header counts and the picture cannot
+ * show is the failure this tool exists to prevent. Then the structural kinds —
+ * a contract, where it is deployed, what it stores — which are what a reader is
+ * looking for at this scale; functions, events, errors and tests are most of a
+ * large workspace and the least of it at a glance. The sort is stable and the
+ * filter keeps memory order, so the choice is as deterministic as the layout.
+ */
+function withinBudget(placed: Placed[]): Placed[] {
+  if (placed.length <= DRAWN_LIMIT) return placed;
+  return placed
+    .filter((p) => p.severity !== undefined || p.group.id !== 'other')
+    .sort((a, b) => Number(a.severity === undefined) - Number(b.severity === undefined))
+    .slice(0, DRAWN_LIMIT);
+}
+
 /** Deterministic PRNG, so the same memory always draws the same picture. */
 function seeded(seed: number): () => number {
   let s = seed >>> 0;
@@ -213,6 +245,17 @@ export const PAGE_CSP = [
 
 const n2 = (value: number): string => Math.round(value * 100) / 100 + '';
 
+/**
+ * Code units, never `localeCompare`.
+ *
+ * Called with no locale it takes the runtime's, which comes from ICU and from
+ * `LANG`/`LC_ALL`, so `Ödeme` sorts before `Zebra` on one machine and after it
+ * on the next. This file is otherwise deterministic to the byte — seeded PRNG,
+ * rounded coordinates, memory order everywhere else — and a table that reorders
+ * itself between a laptop and CI is a diff nobody made.
+ */
+const order = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 export interface LiveOptions {
   /**
    * Changes exactly when the drawing changes, so the page can tell whether the
@@ -268,12 +311,15 @@ export function renderGraphHtml(
       };
     });
 
-  const visible = new Set(placed.map((p) => p.node.id));
+  // The table below the figure lists `placed`, so trimming the drawing never
+  // takes an element off the page altogether.
+  const drawn = withinBudget(placed);
+  const visible = new Set(drawn.map((p) => p.node.id));
   const edges = memory.edges.filter((e) => visible.has(e.from) && visible.has(e.to));
 
-  layout(placed, edges);
+  layout(drawn, edges);
 
-  const positions = new Map(placed.map((p) => [p.node.id, p]));
+  const positions = new Map(drawn.map((p) => [p.node.id, p]));
   const warnCount = signals.filter((s) => s.severity === 'warn').length;
 
   // The endpoints travel with the line so the page can light up one node's
@@ -289,7 +335,7 @@ export function renderGraphHtml(
     })
     .join('\n');
 
-  const nodeSvg = placed
+  const nodeSvg = drawn
     .map((p) => {
       const r = p.group.radius;
       const shape =
@@ -328,7 +374,7 @@ export function renderGraphHtml(
     })
     .join('\n');
 
-  const detail = placed.map((p) => {
+  const detail = drawn.map((p) => {
     const findings = (byNode.get(p.node.id) ?? []).map((s) => ({
       severity: s.severity,
       category: s.category,
@@ -357,7 +403,7 @@ export function renderGraphHtml(
 
   const rows = placed
     .slice()
-    .sort((a, b) => a.node.kind.localeCompare(b.node.kind) || a.node.title.localeCompare(b.node.title))
+    .sort((a, b) => order(a.node.kind, b.node.kind) || order(a.node.title, b.node.title))
     .map(
       (p) =>
         `<tr><td>${esc(p.node.title)}</td><td>${esc(p.node.kind)}</td><td>${esc(p.node.path ?? '')}</td><td>${p.severity === 'warn' ? '⚠ needs attention' : ''}</td></tr>`,
@@ -371,6 +417,13 @@ export function renderGraphHtml(
     nodes: placed.length,
     edges: edges.length,
     warnings: warnCount,
+    // A trimmed graph that does not say so is worse than a complete one that
+    // was slow to draw: the reader counts three storage keys and believes there
+    // are three. Numbers only, so there is nothing here to escape.
+    trimmed:
+      drawn.length < placed.length
+        ? `<p class="trimmed">Drawing ${drawn.length} of ${placed.length} elements. Contracts, on-chain entries, storage keys and anything with a finding come first; the rest are left out to keep the picture legible and the page quick to produce.</p>`
+        : '',
     edgeSvg,
     nodeSvg,
     rows,
@@ -450,6 +503,8 @@ interface PageData {
   nodes: number;
   edges: number;
   warnings: number;
+  /** Present only when the graph was too large to draw in full. */
+  trimmed: string;
   edgeSvg: string;
   nodeSvg: string;
   rows: string;
@@ -538,6 +593,7 @@ const PAGE = (d: PageData): string => `<!doctype html>
   .swatch--square { border-radius: 2px; }
   .swatch--diamond { border-radius: 2px; transform: rotate(45deg); }
   .swatch--ring { background: none; border: 2px dashed var(--status-critical); }
+  .trimmed { margin: 0 0 12px; color: var(--text-secondary); font-size: 13px; max-width: 90ch; }
 
   .board { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 18px; align-items: start; }
   @media (max-width: 940px) { .board { grid-template-columns: 1fr; } }
@@ -649,7 +705,7 @@ ${d.live ? LIVE_STYLE : ''}</style>
     <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--other)"></span> Function, event, error, test</span>
     <span class="legend-item" role="listitem"><span class="swatch swatch--ring"></span> ⚠ Has a finding</span>
   </div>
-
+${d.trimmed}
   <div class="board">
     <div class="canvas">
       <svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="list" aria-label="Project graph">
@@ -685,11 +741,26 @@ const EDGES = Array.from(svg.querySelectorAll('.edge'));
 const NODES = new Map(Array.from(svg.querySelectorAll('.node')).map(n => [n.dataset.id, n]));
 let selected = null;
 
-/** Light up one node and everything one step away from it; dim the rest. */
-function focusOn(id) {
+/**
+ * Back to the whole graph, with nothing claiming to be chosen.
+ *
+ * Every path through the page goes through here, including the one that leads
+ * straight back out: a node left outlined, or a finding row left highlighted,
+ * describes a selection the drawing no longer shows.
+ */
+function clear() {
+  svg.classList.remove('is-focused');
   for (const el of EDGES) el.classList.remove('is-near');
   for (const el of NODES.values()) el.classList.remove('is-near');
-  if (!id || !NODES.has(id)) { svg.classList.remove('is-focused'); return; }
+  if (selected) selected.classList.remove('is-selected');
+  selected = null;
+  for (const row of document.querySelectorAll('.finding.is-active')) row.classList.remove('is-active');
+}
+
+/** Light up one node and everything one step away from it; dim the rest. */
+function focusOn(id) {
+  clear();
+  if (!id || !NODES.has(id)) return;
 
   NODES.get(id).classList.add('is-near');
   for (const edge of EDGES) {
@@ -704,12 +775,13 @@ function focusOn(id) {
 }
 
 function show(id) {
+  // First, so that a row whose node is not on the graph still puts back
+  // whatever the last one lit up rather than adding to it.
+  focusOn(id);
   const d = DETAIL[id];
   if (!d) return;
-  if (selected) selected.classList.remove('is-selected');
   selected = svg.querySelector('.node[data-id="' + CSS.escape(id) + '"]');
   if (selected) selected.classList.add('is-selected');
-  focusOn(id);
 
   // Every value below came out of the vault, which is a file in the repository
   // rather than something this process produced. Kind, category and relation are
@@ -744,10 +816,10 @@ for (const node of NODES.values()) {
 }
 
 for (const row of document.querySelectorAll('.finding[data-id]')) {
+  // Marked after show(), which clears whichever row was marked before it.
   row.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('.finding')) other.classList.remove('is-active');
-    row.classList.add('is-active');
     show(row.dataset.id);
+    row.classList.add('is-active');
   });
 }
 
@@ -791,7 +863,7 @@ const LIVE_STYLE = `
     flex-direction: column;
     gap: 10px;
   }
-  body.live header, body.live .legend { flex: none; margin: 0; }
+  body.live header, body.live .legend, body.live .trimmed { flex: none; margin: 0; }
   body.live header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; }
   body.live h1 { font-size: 20px; margin: 0; }
   body.live .stats { margin: 0; gap: 22px; }

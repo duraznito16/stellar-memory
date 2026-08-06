@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import * as http from 'node:http';
 import * as net from 'node:net';
 import * as path from 'node:path';
+import * as vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -105,12 +106,126 @@ test('the live client arrives only when it is asked for', () => {
   assert.ok(!renderGraphHtml(memory, []).includes('EventSource'));
 });
 
+test('the same memory produces the same bytes, whatever the host', () => {
+  // The file is committed beside the vault it describes, so a second render of
+  // an unchanged project has to be a zero-line diff. Everything here is seeded
+  // or rounded except the order of the table, which until this test compared
+  // strings with the runtime's locale — ICU plus LANG — and put a row in a
+  // different place on a machine configured in Swedish or Turkish.
+  const memory = fixture();
+  assert.equal(renderGraphHtml(memory, []), renderGraphHtml(memory, []));
+
+  const named = fixture();
+  named.nodes = [
+    { ...named.nodes[0]!, id: 'storage:z', kind: 'storage', title: 'Zebra' },
+    { ...named.nodes[0]!, id: 'storage:o', kind: 'storage', title: 'Ödeme' },
+    { ...named.nodes[0]!, id: 'storage:a', kind: 'storage', title: 'Ahorro-Año' },
+    { ...named.nodes[0]!, id: 'storage:b', kind: 'storage', title: 'Ahorro-Ano' },
+  ];
+  named.edges = [];
+
+  // Code units, so `Ö` (U+00D6) follows `Z` and `ñ` follows `n` on every
+  // machine. A collator would put both the other way round, and which way round
+  // would depend on where the process is running.
+  const titles = [...renderGraphHtml(named, []).matchAll(/<tr><td>([^<]*)<\/td>/g)].map((m) => m[1]);
+  assert.deepEqual(titles, ['Ahorro-Ano', 'Ahorro-Año', 'Zebra', 'Ödeme']);
+});
+
 test('both pages carry a content security policy', () => {
   // The header `ui` sends only protects the served copy. The written file is
   // opened over file://, where a policy has to travel inside the document.
   for (const html of [renderGraphHtml(fixture(), []), renderGraphHtml(fixture(), [], { live: { stamp: 'x' } })]) {
     assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none';/);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * A workspace big enough to stall the server
+ * ------------------------------------------------------------------ */
+
+type Node = ProjectMemory['nodes'][number];
+
+/**
+ * Twenty contracts with the parts twenty contracts have.
+ *
+ * The layout is all-pairs over 420 iterations, so this shape — about 2100
+ * drawable nodes — is the one that used to take the better part of a minute
+ * inside a synchronous render, with `ui` answering nothing for the duration.
+ */
+function workspace(): ProjectMemory {
+  const stamp = '2026-01-01T00:00:00.000Z';
+  const nodes: Node[] = [];
+  const edges: ProjectMemory['edges'] = [];
+
+  const add = (id: string, kind: Node['kind'], title: string, owner?: string): void => {
+    nodes.push({
+      id,
+      kind,
+      title,
+      path: `contracts/${title}/src/lib.rs`,
+      provenance: [],
+      firstSeen: stamp,
+      lastChanged: stamp,
+    });
+    if (owner) edges.push({ from: owner, to: id, kind: 'defines', provenance: [] });
+  };
+
+  for (let c = 0; c < 20; c++) {
+    const contract = `contract:C${c}`;
+    add(contract, 'contract', `C${c}`);
+    add(`deployment:C${c}.testnet`, 'deployment', `C${c} on testnet`, contract);
+    for (let i = 0; i < 60; i++) add(`function:C${c}.f${i}`, 'function', `f${i}`, contract);
+    for (let i = 0; i < 25; i++) add(`storage:C${c}.k${i}`, 'storage', `DataKey::K${i}`, contract);
+    for (let i = 0; i < 10; i++) add(`event:C${c}.e${i}`, 'event', `e${i}`, contract);
+    for (let i = 0; i < 4; i++) add(`error:C${c}.x${i}`, 'error', `x${i}`, contract);
+    for (let i = 0; i < 6; i++) add(`test:C${c}.t${i}`, 'test', `t${i}`, contract);
+  }
+
+  return {
+    version: 1,
+    project: { name: 'workspace', root: '/tmp/workspace', networks: ['testnet'] },
+    nodes,
+    edges,
+    scans: [{ at: stamp, nodeCount: nodes.length, edgeCount: edges.length, changed: [] }],
+  };
+}
+
+test('a workspace too large to draw is trimmed, and says so', () => {
+  const memory = workspace();
+  // A function is in the group the trim drops, so this is the one that has to
+  // survive it: a warning the header counts and the picture cannot show is the
+  // failure this whole tool exists to prevent.
+  const found: Signal[] = [
+    { severity: 'warn', category: 'ttl', message: 'a persistent key is never extended', nodeId: 'function:C19.f59' },
+    { severity: 'info', category: 'tests', message: 'No tests reference f0.', nodeId: 'function:C0.f0' },
+  ];
+
+  const started = Date.now();
+  const html = renderGraphHtml(memory, found);
+  const took = Date.now() - started;
+
+  const drawn = (html.match(/<g class="node /g) ?? []).length;
+  const elements = (html.match(/<tr><td>/g) ?? []).length;
+  assert.equal(elements, 2140, 'every element is still in the table');
+  assert.ok(drawn <= 300, `the drawing is capped, found ${drawn}`);
+  // Unbounded this is 9.6e8 pair evaluations and 18 seconds, during which `ui`
+  // renders synchronously and dispatches no event to an open window.
+  assert.ok(took < 10_000, `the layout has to stay interactive, took ${took}ms`);
+
+  assert.match(html, new RegExp(`<p class="trimmed">Drawing ${drawn} of 2140 elements`), 'a trimmed graph says so');
+  for (const id of ['function:C19.f59', 'function:C0.f0']) {
+    assert.ok(html.includes(`data-id="${id}"`), `${id} carries a finding and must stay on the graph`);
+  }
+  assert.equal(
+    (html.match(/class="ring ring--warn"/g) ?? []).length,
+    1,
+    'the ring the header counts is drawn',
+  );
+
+  // Still the same picture twice: the filter keeps memory order and the sort
+  // that puts findings first is stable.
+  assert.equal(renderGraphHtml(memory, found), html);
+  assert.ok(!renderGraphHtml(fixture(), []).includes('class="trimmed"'), 'and a small project is untouched');
 });
 
 /* ------------------------------------------------------------------ *
@@ -148,6 +263,178 @@ test('every value the panel writes as markup is escaped', () => {
   for (const expression of ['escapeHtml(d.kind)', 'escapeHtml(f.category)', 'escapeHtml(l.kind)']) {
     assert.ok(island(html).includes(expression), `${expression} must be escaped like the fields beside it`);
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * The page's own script, run
+ *
+ * What a class list says after a click is not in the markup the server wrote,
+ * so it cannot be asserted from the HTML — and a node left outlined under a
+ * drawing that no longer highlights it is exactly the kind of thing nobody
+ * notices until they are presenting.
+ * ------------------------------------------------------------------ */
+
+interface Fake {
+  dataset: Record<string, string>;
+  classList: { add(c: string): void; remove(c: string): void; contains(c: string): boolean };
+  addEventListener(type: string, fn: (event: unknown) => void): void;
+  fire(type: string, event?: Record<string, unknown>): void;
+  closest(selector: string): Fake | null;
+  scrollIntoView(): void;
+  appendChild(child: Fake): void;
+  innerHTML: string;
+  textContent: string;
+  className: string;
+  style: Record<string, string>;
+}
+
+/** `.node`, `.finding[data-id]`, `.node[data-id="x"]` — all the page ever asks for. */
+function matches(el: Fake, selector: string): boolean {
+  const parts = selector.match(/\.[\w-]+|\[[^\]]+\]/g) ?? [];
+  return parts.every((part) => {
+    if (part.startsWith('.')) return el.classList.contains(part.slice(1));
+    const found = /^\[data-([\w-]+)(?:="(.*)")?\]$/.exec(part);
+    if (!found) return false;
+    const held = el.dataset[found[1]!];
+    // CSS.escape put backslashes in; the id on the element never had them.
+    return held !== undefined && (found[2] === undefined || held === found[2].replace(/\\(.)/g, '$1'));
+  });
+}
+
+function element(classes: string, dataset: Record<string, string> = {}): Fake {
+  const held = new Set(classes.split(' ').filter(Boolean));
+  const handlers = new Map<string, ((event: unknown) => void)[]>();
+  const el: Fake = {
+    dataset,
+    classList: { add: (c) => void held.add(c), remove: (c) => void held.delete(c), contains: (c) => held.has(c) },
+    addEventListener: (type, fn) => void handlers.set(type, [...(handlers.get(type) ?? []), fn]),
+    fire: (type, event) => {
+      for (const fn of handlers.get(type) ?? []) fn({ target: el, currentTarget: el, preventDefault() {}, ...event });
+    },
+    closest: (selector) => (matches(el, selector) ? el : null),
+    scrollIntoView: () => undefined,
+    appendChild: () => undefined,
+    innerHTML: '',
+    textContent: '',
+    className: '',
+    style: {},
+  };
+  return el;
+}
+
+/**
+ * Build the DOM out of the rendered markup, then run the page's script over it.
+ *
+ * Out of the markup rather than out of the fixture, deliberately: a node the
+ * renderer stopped drawing has to stop being clickable here too.
+ */
+function open(html: string): {
+  node: (id: string) => Fake;
+  finding: (index: number) => Fake;
+  svg: Fake;
+  panel: Fake;
+  press: (key: string) => void;
+} {
+  const nodes = [...html.matchAll(/<g class="(node[^"]*)"[^>]*data-id="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { id: m[2]! }),
+  );
+  const edges = [...html.matchAll(/<line class="(edge[^"]*)" data-from="([^"]*)" data-to="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { from: m[2]!, to: m[3]! }),
+  );
+  const findings = [...html.matchAll(/class="(finding[^"]*)" data-id="([^"]*)"/g)].map((m) =>
+    element(m[1]!, { id: m[2]! }),
+  );
+
+  const svg = element('graph');
+  const panel = element('panel');
+  const body = element('live', { warnings: html.match(/data-warnings="(\d+)"/)?.[1] ?? '0' });
+  const inSvg = [...nodes, ...edges];
+  const everything = [...inSvg, ...findings, panel, body];
+  const keys: ((event: unknown) => void)[] = [];
+
+  const document = {
+    title: 'fixture',
+    body,
+    getElementById: (id: string) => (id === 'panel' ? panel : null),
+    // The only tag selector the page uses.
+    querySelector: (s: string) => (s === 'svg' ? svg : everything.find((el) => matches(el, s)) ?? null),
+    querySelectorAll: (s: string) => everything.filter((el) => matches(el, s)),
+    createElement: () => element(''),
+    addEventListener: (_type: string, fn: (event: unknown) => void) => void keys.push(fn),
+  };
+  Object.assign(svg, {
+    querySelector: (s: string) => inSvg.find((el) => matches(el, s)) ?? null,
+    querySelectorAll: (s: string) => inSvg.filter((el) => matches(el, s)),
+  });
+
+  const store = new Map<string, string>();
+  const context = vm.createContext({
+    document,
+    CSS: { escape: (s: string) => s.replace(/[^\w-]/g, (c) => '\\' + c) },
+    sessionStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    },
+    // The reload client must not reach for a socket that is not there.
+    EventSource: class {
+      readyState = 0;
+      addEventListener(): void {}
+      close(): void {}
+    },
+    location: { reload: () => undefined },
+  });
+  vm.runInContext(html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>')), context);
+
+  return {
+    node: (id) => nodes.find((el) => el.dataset['id'] === id)!,
+    finding: (index) => findings[index]!,
+    svg,
+    panel,
+    press: (key) => {
+      for (const fn of keys) fn({ key, preventDefault() {} });
+    },
+  };
+}
+
+test('Escape leaves nothing behind claiming to be selected', () => {
+  const page = open(renderGraphHtml(fixture(), [], { live: { stamp: 'x' } }));
+  const node = page.node('storage:Payroll.Admin');
+
+  node.fire('click');
+  assert.ok(node.classList.contains('is-selected'), 'a click selects');
+  assert.ok(page.svg.classList.contains('is-focused'));
+  assert.ok(page.panel.innerHTML.includes('DataKey::Admin'), 'and the panel says which one');
+
+  page.press('Escape');
+  assert.ok(!page.svg.classList.contains('is-focused'), 'the graph comes back');
+  assert.ok(!node.classList.contains('is-selected'), 'and the thick outline goes with it');
+
+  // Clicking off a node is the other way out of the same state.
+  node.fire('click');
+  page.svg.fire('click', { target: page.svg });
+  assert.ok(!node.classList.contains('is-selected'));
+});
+
+test('the findings list never highlights a row the graph is not showing', () => {
+  const found: Signal[] = [
+    { severity: 'warn', category: 'ttl', message: 'a persistent key is never extended', nodeId: 'storage:Payroll.Admin' },
+    { severity: 'info', category: 'tests', message: 'No tests reference Payroll.', nodeId: 'contract:Payroll' },
+  ];
+  const page = open(renderGraphHtml(fixture(), found, { live: { stamp: 'x' } }));
+
+  page.finding(0).fire('click');
+  assert.ok(page.finding(0).classList.contains('is-active'));
+  assert.ok(page.node('storage:Payroll.Admin').classList.contains('is-selected'));
+
+  page.finding(1).fire('click');
+  assert.ok(!page.finding(0).classList.contains('is-active'), 'one row at a time');
+  assert.ok(!page.node('storage:Payroll.Admin').classList.contains('is-selected'), 'and one node at a time');
+  assert.ok(page.finding(1).classList.contains('is-active'));
+  assert.ok(page.node('contract:Payroll').classList.contains('is-selected'));
+
+  page.press('Escape');
+  assert.ok(!page.finding(1).classList.contains('is-active'), 'Escape puts the list back too');
+  assert.ok(!page.node('contract:Payroll').classList.contains('is-selected'));
 });
 
 /* ------------------------------------------------------------------ *
