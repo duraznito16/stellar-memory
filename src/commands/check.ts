@@ -31,18 +31,19 @@ export async function runCheck(options: CheckOptions): Promise<void> {
   const memory = await tryLoadMemory(root);
 
   if (!memory || memory.nodes.length === 0) {
-    warn('No memory to check. Run `stellar-memory scan` first.');
-    process.exitCode = 2; // distinct from "checks failed"
+    misconfigured(options, 'no_memory', 'No memory to check. Run `stellar-memory scan` first.');
     return;
   }
 
   const requested = parseCategories(options.failOn);
   if (requested.invalid.length > 0) {
-    warn(
+    misconfigured(
+      options,
+      'unknown_category',
       `Unknown categor${requested.invalid.length === 1 ? 'y' : 'ies'}: ${requested.invalid.join(', ')}. ` +
         `Valid: ${SIGNAL_CATEGORIES.join(', ')}.`,
+      { invalid: requested.invalid, valid: SIGNAL_CATEGORIES },
     );
-    process.exitCode = 2;
     return;
   }
 
@@ -94,6 +95,32 @@ export async function runCheck(options: CheckOptions): Promise<void> {
   out();
   note(dim('  Categories: ' + SIGNAL_CATEGORIES.join(', ')));
   process.exitCode = 1;
+}
+
+/**
+ * Exit 2 — the gate could not run. Distinct from "checks failed", and under
+ * `--json` it has to be a document too: stdout is the only channel a pipeline
+ * reads, and an empty one there is indistinguishable from a crash.
+ */
+function misconfigured(
+  options: CheckOptions,
+  error: 'no_memory' | 'unknown_category',
+  message: string,
+  detail: Record<string, unknown> = {},
+): void {
+  warn(message);
+  if (options.json) {
+    out(
+      JSON.stringify(
+        // The keys a clean run emits are kept, empty, so that a consumer reading
+        // `.ok` or iterating `.failing` gets an answer rather than an exception.
+        { ok: false, error, message, ...detail, failed_on: [], failing: [], other: [] },
+        null,
+        2,
+      ),
+    );
+  }
+  process.exitCode = 2;
 }
 
 function parseCategories(raw: string | undefined): {
