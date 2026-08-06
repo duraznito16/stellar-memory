@@ -51,7 +51,7 @@ Soroban contract with 4 public functions.
 <details><summary>Where this came from</summary>
 
 - Parsed from `contracts/employee-registry/src/lib.rs:12`
-- Reported by `stellar contract info hash --wasm target/wasm32v1-none/release/employee_registry.wasm` (ground truth)
+- Read from `target/wasm32v1-none/release/employee_registry.wasm`
 
 </details>
 <!-- /stellar-memory:auto -->

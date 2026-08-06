@@ -20,6 +20,7 @@ Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
 - **Network:** `testnet`
 - **Contract ID:** `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`
 - **Alias:** `pay-token`
+- **Drift:** not checked — the deployed Wasm was never compared with a local build, so whether they agree is unknown.
 
 ---
 
