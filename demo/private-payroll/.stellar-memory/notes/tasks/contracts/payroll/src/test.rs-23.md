@@ -4,8 +4,8 @@ kind: task
 title: pay() needs an end-to-end test with a real Treasury and
 path: contracts/payroll/src/test.rs
 summary: TODO in `contracts/payroll/src/test.rs:23`
-first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-06T02:38:54.805Z
+first_seen: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T05:42:22.027Z
 tags:
   - stellar-memory
   - kind/task

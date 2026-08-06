@@ -145,8 +145,12 @@ export async function listAliases(network: string, cwd?: string): Promise<AliasE
     if (entry.network === network) found.set(`${entry.alias}:${entry.contractId}`, entry);
   };
 
-  // `alias ls` takes no --network flag; it reports whichever network the CLI is
-  // currently pointed at, so scope it through the environment instead.
+  // `alias ls` takes no --network flag, so scope it through the environment.
+  // Verified empirically: it prints the same entries whatever STELLAR_NETWORK
+  // says, so the network on a CLI-derived entry is a hint, not evidence. Only
+  // the alias files below key ids by passphrase and can be trusted on that
+  // point — which is why a deployment is not recorded until the network itself
+  // answers something about the contract.
   const res = await runStellar(['contract', 'alias', 'ls'], { env: { STELLAR_NETWORK: network } });
   if (res.ok) {
     // One `alias: CONTRACT_ID` per line, preceded by an informational line.

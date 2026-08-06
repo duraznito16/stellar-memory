@@ -4,8 +4,8 @@ kind: asset
 title: Token (token)
 path: contracts/treasury/src/lib.rs
 summary: Token contract this project moves value through.
-first_seen: 2026-08-05T03:43:28.401Z
-last_changed: 2026-08-05T03:43:28.401Z
+first_seen: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T05:42:22.027Z
 tags:
   - stellar-memory
   - kind/asset

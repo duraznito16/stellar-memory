@@ -1007,6 +1007,22 @@ async function recordDeployment(
 
   const onChainHash = await fetchWasmHash({ contractId: alias.contractId, network });
   const meta = await fetchMeta({ contractId: alias.contractId, network });
+  // The deployed interface is ground truth; fetched here rather than after the
+  // node exists, because whether anything answered decides if there is a node.
+  const spec = await fetchInterface({ contractId: alias.contractId, network });
+
+  // Three silent reads are not evidence of a live contract. An alias can name a
+  // network it was never deployed to — `alias ls` reports the same entries
+  // whatever STELLAR_NETWORK says — and a network with no RPC configured
+  // answers nothing at all. Recording a deployment anyway produced notes saying
+  // "Live at C..." on mainnet for contracts that only exist on testnet, with a
+  // provenance line crediting a command that had in fact errored. A missing
+  // deployment is a gap; an invented one is the failure this tool exists to
+  // prevent.
+  //
+  // Any one of the three is proof enough: `info hash` fails by design on a
+  // Stellar Asset Contract, which has no downloadable Wasm but is certainly live.
+  if (!onChainHash && !meta && !spec) return false;
 
   // Match the alias to a contract in source: by name, then by Wasm hash.
   let matched: MemoryNode | undefined;
@@ -1040,10 +1056,15 @@ async function recordDeployment(
     title: `${alias.alias} @ ${network}`,
     summary: `Live at \`${alias.contractId}\`${drift === 'stale' ? ' — out of sync with local source' : ''}.`,
     data: data as unknown as Record<string, unknown>,
+    // Cite the read that actually answered. Naming `info hash` when only the
+    // interface came back sends a reader to a command that will fail for them.
     provenance: [
       {
         source: 'stellar-cli',
-        command: describeCommand(['contract', 'info', 'hash'], { contractId: alias.contractId }),
+        command: describeCommand(
+          ['contract', 'info', onChainHash ? 'hash' : meta ? 'meta' : 'interface'],
+          { contractId: alias.contractId },
+        ),
         network,
       },
     ],
@@ -1059,8 +1080,6 @@ async function recordDeployment(
     });
   }
 
-  // The deployed interface is ground truth; record it alongside the parsed one.
-  const spec = await fetchInterface({ contractId: alias.contractId, network });
   if (spec && matched) {
     const parsedFns = new Set(((matched.data as unknown as ContractData).functions ?? []));
     const onChainFns = spec.functions.map((f) => f.name);

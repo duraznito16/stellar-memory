@@ -4,8 +4,8 @@ kind: type
 title: DataKey
 path: contracts/payroll/src/lib.rs
 summary: Contract type (`#[contracttype]`).
-first_seen: 2026-08-05T04:15:44.462Z
-last_changed: 2026-08-05T04:15:44.462Z
+first_seen: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T05:42:22.027Z
 tags:
   - stellar-memory
   - kind/type

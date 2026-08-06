@@ -3,8 +3,8 @@ id: deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN
 kind: deployment
 title: employee-registry @ testnet
 summary: Live at `CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN`.
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/deployment

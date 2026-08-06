@@ -4,8 +4,8 @@ kind: task
 title: Complete withdrawal tests for Payroll
 path: demo/private-payroll/README.md
 summary: CHECKLIST in `demo/private-payroll/README.md:24`
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/task

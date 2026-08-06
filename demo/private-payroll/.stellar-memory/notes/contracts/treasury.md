@@ -4,8 +4,8 @@ kind: contract
 title: Treasury
 path: contracts/treasury/src/lib.rs
 summary: Soroban contract with 5 public functions.
-first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-06T02:37:04.452Z
+first_seen: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T05:42:22.027Z
 tags:
   - stellar-memory
   - kind/contract
@@ -26,7 +26,12 @@ Soroban contract with 5 public functions.
 - `balance(env: Env, token: Address) -> i128` — [[functions/treasury.balance|balance]]
 - `payroll_address(env: Env) -> Result<Address, TreasuryError>` — [[functions/treasury.payroll_address|payroll_address]]
 
+**Local Wasm hash:** `eaf0965402d93d78878a9ae409f0c1996d0f967492983926cc59d60aa347873b`
+
 ## Connections
+
+**Deployed as**
+- [[deployments/testnet.cdnr3wxjiy7gczgy6kkfuw3bv3h5k654y4iipd4zwurhngkfhhyare4r|treasury @ testnet]] — deployed build is older than source
 
 **Defined in**
 - [[crates/treasury|treasury]]
@@ -51,6 +56,7 @@ Soroban contract with 5 public functions.
 <details><summary>Where this came from</summary>
 
 - Parsed from `contracts/treasury/src/lib.rs:24`
+- Reported by `stellar contract info hash --wasm target/wasm32v1-none/release/treasury.wasm` (ground truth)
 
 </details>
 <!-- /stellar-memory:auto -->

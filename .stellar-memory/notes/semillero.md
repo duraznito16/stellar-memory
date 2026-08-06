@@ -3,8 +3,8 @@ id: project:Semillero
 kind: project
 title: Semillero
 summary: "**A persistent memory layer for Stellar and Soroban projects.**"
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/project
@@ -20,9 +20,9 @@ tags:
 - 13 functions
 - 13 docs
 - 10 storages
-- 8 deployments
 - 6 tasks
 - 5 events
+- 4 deployments
 - 3 crates
 - 3 contracts
 - 3 types
@@ -44,7 +44,7 @@ tags:
 
 <details><summary>Where this came from</summary>
 
-- From git `092421631e3979e8220a59efd1cf5670953cdefa`
+- From git `a79ca46f94497b9c4c85aaf72ad65ca97a7f3112`
 
 </details>
 <!-- /stellar-memory:auto -->

@@ -3,8 +3,8 @@ id: deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 kind: deployment
 title: pay-token @ testnet
 summary: Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/deployment
@@ -25,7 +25,7 @@ Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
 
 <details><summary>Where this came from</summary>
 
-- Reported by `stellar contract info hash --id CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` on `testnet` (ground truth)
+- Reported by `stellar contract info interface --id CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` on `testnet` (ground truth)
 
 </details>
 <!-- /stellar-memory:auto -->

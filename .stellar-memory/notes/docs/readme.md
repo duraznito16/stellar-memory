@@ -4,8 +4,8 @@ kind: doc
 title: README.md
 path: README.md
 summary: "**A persistent memory layer for Stellar and Soroban projects.**"
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/doc

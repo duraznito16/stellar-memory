@@ -3,8 +3,8 @@ id: storage:EmployeeRegistry.persistent.DataKey::Salary(employee)
 kind: storage
 title: DataKey::Salary(employee) (persistent)
 path: demo/private-payroll/contracts/employee-registry/src/lib.rs
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/storage

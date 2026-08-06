@@ -3,8 +3,8 @@ id: storage:Treasury.instance.DataKey::Payroll
 kind: storage
 title: DataKey::Payroll (instance)
 path: demo/private-payroll/contracts/treasury/src/lib.rs
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/storage

@@ -4,8 +4,8 @@ kind: contract
 title: Treasury
 path: demo/private-payroll/contracts/treasury/src/lib.rs
 summary: Soroban contract with 5 public functions.
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/contract
@@ -30,7 +30,6 @@ Soroban contract with 5 public functions.
 
 **Deployed as**
 - [[deployments/testnet.cdnr3wxjiy7gczgy6kkfuw3bv3h5k654y4iipd4zwurhngkfhhyare4r|treasury @ testnet]]
-- [[deployments/mainnet.cdnr3wxjiy7gczgy6kkfuw3bv3h5k654y4iipd4zwurhngkfhhyare4r|treasury @ mainnet]]
 
 **Defined in**
 - [[crates/treasury|treasury]]

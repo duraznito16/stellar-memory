@@ -4,8 +4,8 @@ kind: test
 title: treasury/test.rs
 path: contracts/treasury/src/test.rs
 summary: Test module.
-first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-05T02:30:56.473Z
+first_seen: 2026-08-06T05:42:22.027Z
+last_changed: 2026-08-06T05:42:22.027Z
 tags:
   - stellar-memory
   - kind/test

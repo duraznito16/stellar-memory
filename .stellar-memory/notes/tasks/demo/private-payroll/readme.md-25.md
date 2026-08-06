@@ -4,8 +4,8 @@ kind: task
 title: Audit the registry's access control before mainnet
 path: demo/private-payroll/README.md
 summary: CHECKLIST in `demo/private-payroll/README.md:25`
-first_seen: 2026-08-06T05:30:18.137Z
-last_changed: 2026-08-06T05:30:18.137Z
+first_seen: 2026-08-06T05:42:08.159Z
+last_changed: 2026-08-06T05:42:08.159Z
 tags:
   - stellar-memory
   - kind/task
