@@ -469,13 +469,13 @@ machine.
 ```
 src/
   scanner/     rust.ts     1144   Soroban source analysis — the hard part
-               scan.ts     1191   graph construction and correlation
+               scan.ts     1210   graph construction and correlation
                cargo.ts     126   workspace parsing
                walk.ts      106   gitignore-aware file walk
   core/        query.ts     685   signals, search, resume, neighbourhoods
                types.ts     247   the graph model
                git.ts       118   HEAD, last commit, dates
-  stellar/     cli.ts       262   read-only Stellar CLI bridge
+  stellar/     cli.ts       266   read-only Stellar CLI bridge
                spec.ts      140   SCSpecEntry → functions, errors, events
   store/       html.ts      915   the self-contained page and the live page
                render.ts    380   Markdown notes
@@ -483,7 +483,7 @@ src/
   ui/          serve.ts     353   loopback HTTP + SSE hub + shutdown
                watch.ts     249   debounced, non-overlapping watchers
                open.ts      242   cross-platform window launcher
-  commands/    mcp.ts       338   the 8 agent-facing tools
+  commands/    mcp.ts       794   the 8 agent-facing tools
                ui.ts        206   wiring for the live window
                graph.ts     200   tree, mermaid, dot, json, html
 ```
@@ -614,7 +614,7 @@ flowchart LR
     P(["push / PR"])
 
     subgraph T["test · Node 24"]
-        T1["54 unit tests"]
+        T1["66 unit tests"]
     end
     subgraph D["dogfood · Node 20"]
         D1["scan the demo offline"] --> D2["gate fires on a real failure"]
@@ -668,9 +668,14 @@ here, and blocking merges on it would only train people to ignore the badge.
 
 ```bash
 npm run build       # compile
-npm test            # parser, MCP handshake, and CI-gate tests
+npm test            # builds first, then parser, MCP handshake, and CI-gate tests
 npm run typecheck
 ```
+
+`npm test` compiles before it runs anything, because the MCP and live-window
+tests spawn `dist/index.js` as a real subprocess — they exercise the CLI that
+ships, not an import of the same source. On a fresh clone there is no `dist/`
+yet, and a suite whose first failure is `ENOENT` teaches a newcomer nothing.
 
 Running the package needs **Node 20+**. Running the *tests* needs **Node 22.6+**,
 because they are TypeScript executed through Node's native type stripping. CI

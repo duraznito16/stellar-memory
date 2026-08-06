@@ -15,7 +15,7 @@ $env:PATH = "$(Join-Path $env:USERPROFILE '.cargo\bin');$env:PATH"
 
 npm run typecheck                    # must be silent
 npm run build                        # must be silent
-npm test                             # expect 17+ passing, 0 failing
+npm test                             # expect 66+ passing, 0 failing
 
 # Clean regeneration of the demo vault
 Remove-Item -Recurse -Force demo/private-payroll/.stellar-memory -ErrorAction SilentlyContinue
@@ -36,8 +36,13 @@ cd ../..
 
 Check these specifics, not just exit codes:
 
+- **66 tests pass, 0 fail.** The suite only ever grows, so a total below the number in the command
+  above means tests were deleted — read the count, not just the exit code.
 - **3 contracts** detected: `Payroll`, `Treasury`, `EmployeeRegistry`.
-- **8 MCP tools** advertised, including `value_surface`.
+- **8 MCP tools** advertised, including `value_surface`. All eight declare `readOnlyHint`, and seven
+  declare an `outputSchema` — every one but `project_overview`, which answers with prose on purpose.
+  Those annotations are the read-only claim in a form the protocol can check, so losing one is a
+  real regression even though the tools still answer.
 - `value_surface` reports `PayrollError` with variants 1–4 and `pay` among its `raised_by`, and
   one `asset` node for the `TokenClient` in `Treasury.withdraw`.
 - `graph` shows **`Payroll calls Treasury` and `Payroll calls EmployeeRegistry`**. Losing an edge
