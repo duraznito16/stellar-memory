@@ -185,7 +185,7 @@ node scripts/mcp-call.mjs describe_node '{"id":"contract:Payroll"}'
 
 ## See it
 
-![The live window: three contracts and their storage as a graph, with all six findings named beside it — the TTL warning on DataKey::LastPaid, four authorization findings, and one project-wide test finding](docs/media/ui-live.png)
+![The live window: three contracts and their storage as a graph, with all seven findings named beside it — the build drift on treasury @ testnet, the TTL warning on DataKey::LastPaid, four authorization findings, and one project-wide test finding](docs/media/ui-live.png)
 
 ```bash
 stellar memory ui
@@ -214,9 +214,9 @@ The demo ships `set_pay_token` with a real defect and a `FIXME` admitting it:
 the function rewrites which token salaries are paid in, and never checks who is
 asking. `stellar memory ui --watch` is running; nothing else is.
 
-**Before** — six findings, one of them that function:
+**Before** — seven findings, one of them that function:
 
-![The window before the edit: Worth knowing 6, listing the missing require_auth on Payroll.set_pay_token](docs/media/watch-before.png)
+![The window before the edit: Worth knowing 7, listing the missing require_auth on Payroll.set_pay_token](docs/media/watch-before.png)
 
 Add the check the FIXME asks for — read the admin out of instance storage and
 require its authorization — and **save**. No command is run:
@@ -226,9 +226,11 @@ let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
 admin.require_auth();
 ```
 
-**After** — five:
+**After** — six, and the window says so itself: the counter carries a `was 7`
+beside it, and the relationship count goes up by one, because the fix added a
+read of `DataKey::Admin` that was not there before.
 
-![The window after saving: Worth knowing 5, the set_pay_token finding gone](docs/media/watch-after.png)
+![The window after saving: Worth knowing 6, the header counting 6 need attention where it was 7, and the set_pay_token finding gone](docs/media/watch-after.png)
 
 The finding did not merely disappear. In the page's own data the function went
 from
@@ -497,7 +499,7 @@ what those two produce.
 
 The window is for working; the file is for the record.
 
-![The same graph written as one self-contained HTML file, with the project-wide finding beside it](docs/media/graph-file.png)
+![The same graph written as one self-contained HTML file, with all seven findings listed beside it and a footer naming the scan it came from — no network, no server](docs/media/graph-file.png)
 
 ```bash
 stellar memory graph --format html
