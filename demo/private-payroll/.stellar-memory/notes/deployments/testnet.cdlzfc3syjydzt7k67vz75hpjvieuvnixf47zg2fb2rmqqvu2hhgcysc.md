@@ -3,8 +3,8 @@ id: deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 kind: deployment
 title: pay-token @ testnet
 summary: Live at `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
-first_seen: 2026-08-05T15:54:59.434Z
-last_changed: 2026-08-05T15:54:59.434Z
+first_seen: 2026-08-06T02:27:23.474Z
+last_changed: 2026-08-06T02:27:23.474Z
 tags:
   - stellar-memory
   - kind/deployment

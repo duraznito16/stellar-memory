@@ -576,6 +576,30 @@ function normaliseName(name: string): string {
 }
 
 /**
+ * Resolve a client name to a contract node, trying the name itself, the crate
+ * that produced it, and the `Contract` suffix convention.
+ */
+function resolveContractByName(
+  client: string,
+  nodes: Map<string, MemoryNode>,
+  contractCrate: Map<string, string>,
+): string | undefined {
+  const byName = new Map<string, string>();
+  for (const node of nodes.values()) {
+    if (node.kind !== 'contract') continue;
+    byName.set(normaliseName(node.title), node.id);
+    const crate = contractCrate.get(node.title);
+    if (crate) byName.set(normaliseName(crate), node.id);
+  }
+  const norm = normaliseName(client);
+  return (
+    byName.get(norm) ??
+    byName.get(norm.replace(/(contract|client)$/, '')) ??
+    byName.get(`${norm}contract`)
+  );
+}
+
+/**
  * Resolve `contractimport!` modules and generated clients to real contract nodes.
  * This is what turns a pile of crates into an architecture diagram.
  *
@@ -638,6 +662,37 @@ function linkCrossContractCalls(
             to: target,
             kind: 'calls',
             note: `via \`${client}::Client\` in \`${fn.name}\``,
+            provenance: [{ source: 'source', file: analysis.rel, line: fn.line }],
+          });
+        }
+
+        // The same call at function granularity: which function calls which
+        // method, on an address from which storage key. The contract-level edge
+        // says Payroll calls Treasury and names the calling function; this lets
+        // an agent trace pay -> withdraw in one hop instead of inferring it.
+        //
+        // It has to happen here rather than while walking files: a contract in a
+        // later file does not exist as a node yet when its caller is parsed.
+        const fnId = `function:${contract.name}.${fn.name}`;
+        if (!nodes.has(fnId)) continue;
+        for (const call of fn.contractCalls) {
+          if (call.kind !== 'generated') continue;
+          const target = resolve(call.client);
+          if (!target || target === fromId) continue;
+          const methods = call.methods.length
+            ? `calls \`${call.methods.join('`, `')}\``
+            : 'constructs a client';
+          const via =
+            call.addressOrigin === 'storage'
+              ? ` — address from \`${call.addressKey}\``
+              : call.addressOrigin === 'param'
+                ? ' — address supplied by the caller'
+                : '';
+          addEdge({
+            from: fnId,
+            to: target,
+            kind: 'calls',
+            note: `${methods}${via}`,
             provenance: [{ source: 'source', file: analysis.rel, line: fn.line }],
           });
         }
@@ -834,6 +889,24 @@ async function indexTasks(
       }
 
       if (!title) continue;
+
+      // A TODO rarely fits on one line, and the continuation is usually the
+      // part that matters — one demo TODO was cut at "so a long-tenured
+      // employee's", one line above the consequence it was warning about.
+      const body: string[] = [title];
+      if (marker !== 'CHECKLIST') {
+        for (let j = i + 1; j < lines.length; j++) {
+          const next = lines[j] ?? '';
+          const continued = /^\s*(?:\/\/|#|\*)\s?(.*)$/.exec(next);
+          const text = continued?.[1]?.trim();
+          // Stop at a blank comment, at code, or at the next marker.
+          if (!text || TASK_MARKER.test(next)) break;
+          body.push(text.replace(/-->\s*$/, '').trim());
+          if (body.join(' ').length > 400) break;
+        }
+      }
+      const full = body.join(' ').replace(/\s+/g, ' ').trim();
+
       const id = `task:${file.rel}#${i + 1}`;
       addNode({
         id,
@@ -842,6 +915,7 @@ async function indexTasks(
         path: file.rel,
         line: i + 1,
         summary: `${marker} in \`${file.rel}:${i + 1}\``,
+        data: full !== title ? { body: full } : undefined,
         provenance: [{ source: 'source', file: file.rel, line: i + 1 }],
       });
 
@@ -1014,9 +1088,12 @@ async function recordDeployment(
         (v) => onChain.has(v.name) && onChain.get(v.name) !== v.code,
       );
       if (drifted.length > 0) {
+        sourceData.deployedCheck = 'differs';
         sourceData.deployedMismatch = drifted
           .map((v) => `${v.name} is ${v.code} in source but ${onChain.get(v.name)} on ${network}`)
           .join('; ');
+      } else {
+        sourceData.deployedCheck = 'matches';
       }
     }
   }

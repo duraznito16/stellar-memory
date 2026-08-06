@@ -150,6 +150,12 @@ export interface ErrorData {
   variants: { name: string; code: number }[];
   /** Set when the deployed contract's spec disagrees with this source. */
   deployedMismatch?: string;
+  /**
+   * Whether the discriminants were compared against the deployed contract at
+   * all. An absent field read as "checked and fine" to some consumers and
+   * "never checked" to others — opposite answers to a go/no-go question.
+   */
+  deployedCheck?: 'matches' | 'differs' | 'not-checked';
 }
 
 export interface AssetData {

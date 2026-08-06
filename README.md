@@ -132,6 +132,18 @@ archivist is the one that makes the vault compound: without someone recording
 *why*, the human half of every note stays empty and the memory only ever
 regenerates rather than accumulates.
 
+### Seeing what an agent sees
+
+The MCP server speaks JSON-RPC over stdio, which is right for an agent and
+awkward for a person. `scripts/mcp-call.mjs` is the bridge — useful for checking
+what a tool actually returns before trusting its description:
+
+```bash
+node scripts/mcp-call.mjs --list
+node scripts/mcp-call.mjs project_overview
+node scripts/mcp-call.mjs describe_node '{"id":"contract:Payroll"}'
+```
+
 ## See it
 
 ![The demo project as a graph: three contracts, their storage, and what is live on testnet](docs/media/graph.png)

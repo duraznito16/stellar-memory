@@ -5,7 +5,7 @@ title: Treasury
 path: contracts/treasury/src/lib.rs
 summary: Soroban contract with 5 public functions.
 first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-05T15:54:59.434Z
+last_changed: 2026-08-06T02:27:23.474Z
 tags:
   - stellar-memory
   - kind/contract
@@ -39,6 +39,7 @@ Soroban contract with 5 public functions.
 
 **Called by**
 - [[contracts/payroll|Payroll]] — via `treasury::Client` in `pay`
+- [[functions/payroll.pay|pay]] — calls `withdraw` — address from `DataKey::Treasury`
 
 **Tested by**
 - [[tests/contracts/payroll/src/test.rs|payroll/test.rs]]

@@ -5,7 +5,7 @@ title: EmployeeRegistry
 path: contracts/employee-registry/src/lib.rs
 summary: Soroban contract with 4 public functions.
 first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-05T15:54:59.434Z
+last_changed: 2026-08-06T02:27:23.474Z
 tags:
   - stellar-memory
   - kind/contract
@@ -38,6 +38,7 @@ Soroban contract with 4 public functions.
 
 **Called by**
 - [[contracts/payroll|Payroll]] — via `registry::Client` in `pay`
+- [[functions/payroll.pay|pay]] — calls `salary_of` — address from `DataKey::Registry`
 
 **Tested by**
 - [[tests/contracts/payroll/src/test.rs|payroll/test.rs]]

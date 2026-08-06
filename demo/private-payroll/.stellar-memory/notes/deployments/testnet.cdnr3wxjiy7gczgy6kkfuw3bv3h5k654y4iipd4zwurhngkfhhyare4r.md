@@ -3,8 +3,8 @@ id: deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R
 kind: deployment
 title: treasury @ testnet
 summary: Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` — out of sync with local source.
-first_seen: 2026-08-05T15:54:59.434Z
-last_changed: 2026-08-05T15:54:59.434Z
+first_seen: 2026-08-06T02:27:23.474Z
+last_changed: 2026-08-06T02:27:23.474Z
 tags:
   - stellar-memory
   - kind/deployment

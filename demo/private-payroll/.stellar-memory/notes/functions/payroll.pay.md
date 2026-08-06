@@ -42,6 +42,10 @@ fn pay(env: Env, employee: Address) -> Result<i128, PayrollError>
 **Emits**
 - [[events/payroll.paid|paid]]
 
+**Calls**
+- [[contracts/employeeregistry|EmployeeRegistry]] — calls `salary_of` — address from `DataKey::Registry`
+- [[contracts/treasury|Treasury]] — calls `withdraw` — address from `DataKey::Treasury`
+
 **Defined in**
 - [[contracts/payroll|Payroll]]
 

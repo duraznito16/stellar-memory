@@ -15,6 +15,7 @@
   "files": [
     "dist",
     "templates",
+    "scripts",
     "README.md"
   ],
   "repository": {
@@ -43,6 +44,7 @@
     "_comment_test": "Tests are TypeScript run through Node's native type stripping, which needs Node 22.6+. What ships is compiled JavaScript and runs on Node 20.",
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "mcp:call": "node scripts/mcp-call.mjs",
     "memory": "node dist/index.js"
   },
   "dependencies": {

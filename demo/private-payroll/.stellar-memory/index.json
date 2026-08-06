@@ -109,7 +109,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "function:EmployeeRegistry.initialize",
@@ -390,7 +390,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "function:Payroll.initialize",
@@ -752,7 +752,8 @@
             "name": "NotInitialized",
             "code": 4
           }
-        ]
+        ],
+        "deployedCheck": "matches"
       },
       "provenance": [
         {
@@ -762,7 +763,7 @@
         }
       ],
       "firstSeen": "2026-08-05T04:15:44.462Z",
-      "lastChanged": "2026-08-05T04:15:44.462Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "test:contracts/payroll/src/test.rs",
@@ -818,7 +819,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "function:Treasury.initialize",
@@ -1218,7 +1219,8 @@
             "name": "NotInitialized",
             "code": 3
           }
-        ]
+        ],
+        "deployedCheck": "matches"
       },
       "provenance": [
         {
@@ -1228,7 +1230,7 @@
         }
       ],
       "firstSeen": "2026-08-05T04:15:44.462Z",
-      "lastChanged": "2026-08-05T04:15:44.462Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "test:contracts/treasury/src/test.rs",
@@ -1290,6 +1292,9 @@
       "path": "contracts/payroll/src/lib.rs",
       "line": 91,
       "summary": "TODO in `contracts/payroll/src/lib.rs:91`",
+      "data": {
+        "body": "this never gets its TTL extended, so a long-tenured employee's payment record can expire and let them be paid twice in a period."
+      },
       "provenance": [
         {
           "source": "source",
@@ -1298,7 +1303,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
+      "lastChanged": "2026-08-06T02:24:16.734Z"
     },
     {
       "id": "task:contracts/payroll/src/lib.rs#103",
@@ -1324,6 +1329,9 @@
       "path": "contracts/payroll/src/test.rs",
       "line": 23,
       "summary": "TODO in `contracts/payroll/src/test.rs:23`",
+      "data": {
+        "body": "pay() needs an end-to-end test with a real Treasury and EmployeeRegistry registered in the same env. Blocked on deciding whether to use contractimport! wasm or register the crates directly in tests."
+      },
       "provenance": [
         {
           "source": "source",
@@ -1332,7 +1340,7 @@
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-04T23:23:28.099Z"
+      "lastChanged": "2026-08-06T02:24:16.734Z"
     },
     {
       "id": "task:README.md#24",
@@ -1428,8 +1436,8 @@
           "network": "testnet"
         }
       ],
-      "firstSeen": "2026-08-05T15:54:59.434Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "firstSeen": "2026-08-06T02:27:23.474Z",
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
@@ -1449,8 +1457,8 @@
           "network": "testnet"
         }
       ],
-      "firstSeen": "2026-08-05T15:54:59.434Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "firstSeen": "2026-08-06T02:27:23.474Z",
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
@@ -1495,8 +1503,8 @@
           "network": "testnet"
         }
       ],
-      "firstSeen": "2026-08-05T15:54:59.434Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "firstSeen": "2026-08-06T02:27:23.474Z",
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
@@ -1542,8 +1550,8 @@
           "network": "testnet"
         }
       ],
-      "firstSeen": "2026-08-05T15:54:59.434Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "firstSeen": "2026-08-06T02:27:23.474Z",
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     },
     {
       "id": "project:private-payroll",
@@ -1552,18 +1560,18 @@
       "summary": "Confidential payroll payments on Stellar. A company funds a Treasury once, and the Payroll contract pays employees from it on a schedule without revealing individual salaries on-chain — only aggregate treasury movements are public.",
       "data": {
         "branch": "master",
-        "head": "5077ad7f667224ac620ee7c4788f93d96d6b0c66",
-        "lastCommitDate": "2026-08-05T10:50:21-05:00",
-        "dirtyFiles": 1
+        "head": "61c85a489fe4d541ae0811f35f2086922a4ca86f",
+        "lastCommitDate": "2026-08-05T20:52:15-05:00",
+        "dirtyFiles": 21
       },
       "provenance": [
         {
           "source": "git",
-          "ref": "5077ad7f667224ac620ee7c4788f93d96d6b0c66"
+          "ref": "61c85a489fe4d541ae0811f35f2086922a4ca86f"
         }
       ],
       "firstSeen": "2026-08-04T23:23:28.099Z",
-      "lastChanged": "2026-08-05T15:54:59.434Z"
+      "lastChanged": "2026-08-06T02:27:23.474Z"
     }
   ],
   "edges": [
@@ -2277,6 +2285,32 @@
       ]
     },
     {
+      "from": "function:Payroll.pay",
+      "to": "contract:EmployeeRegistry",
+      "kind": "calls",
+      "note": "calls `salary_of` — address from `DataKey::Registry`",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/payroll/src/lib.rs",
+          "line": 58
+        }
+      ]
+    },
+    {
+      "from": "function:Payroll.pay",
+      "to": "contract:Treasury",
+      "kind": "calls",
+      "note": "calls `withdraw` — address from `DataKey::Treasury`",
+      "provenance": [
+        {
+          "source": "source",
+          "file": "contracts/payroll/src/lib.rs",
+          "line": 58
+        }
+      ]
+    },
+    {
       "from": "test:contracts/payroll/src/test.rs",
       "to": "contract:EmployeeRegistry",
       "kind": "tests",
@@ -2655,6 +2689,55 @@
         "contract:EmployeeRegistry",
         "contract:Payroll",
         "contract:Treasury",
+        "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
+        "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
+        "deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R",
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-06T02:24:16.734Z",
+      "commit": "61c85a489fe4d541ae0811f35f2086922a4ca86f",
+      "nodeCount": 55,
+      "edgeCount": 73,
+      "changed": [
+        "error:payroll.PayrollError",
+        "error:treasury.TreasuryError",
+        "task:contracts/payroll/src/lib.rs#91",
+        "task:contracts/payroll/src/test.rs#23",
+        "project:private-payroll"
+      ]
+    },
+    {
+      "at": "2026-08-06T02:26:35.617Z",
+      "commit": "61c85a489fe4d541ae0811f35f2086922a4ca86f",
+      "nodeCount": 51,
+      "edgeCount": 72,
+      "changed": [
+        "contract:EmployeeRegistry",
+        "contract:Payroll",
+        "error:payroll.PayrollError",
+        "contract:Treasury",
+        "error:treasury.TreasuryError",
+        "project:private-payroll",
+        "removed:deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
+        "removed:deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        "removed:deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",
+        "removed:deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R"
+      ]
+    },
+    {
+      "at": "2026-08-06T02:27:23.474Z",
+      "commit": "61c85a489fe4d541ae0811f35f2086922a4ca86f",
+      "nodeCount": 55,
+      "edgeCount": 75,
+      "changed": [
+        "contract:EmployeeRegistry",
+        "contract:Payroll",
+        "error:payroll.PayrollError",
+        "contract:Treasury",
+        "error:treasury.TreasuryError",
         "deployment:testnet.CA2UQYD63JWH5MXVEMTPIWEQZ2EQ7DLBUMZROWTKBN5UFLYCL7O2TWRN",
         "deployment:testnet.CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
         "deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU",

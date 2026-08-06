@@ -458,7 +458,7 @@ export function signals(memory: ProjectMemory): Signal[] {
 }
 
 /** How a function's authorization reads in the digest an agent is given. */
-function describeAuth(data: FunctionData | undefined): string {
+export function describeAuth(data: FunctionData | undefined): string {
   if (!data?.requiresAuth) return '';
   const subjects = data.authSubjects ?? [];
   if (subjects.length === 0) return ' [requires auth, subject unresolved]';
@@ -526,6 +526,14 @@ export interface ResumeReport {
   purpose?: string;
   lastScan?: string;
   lastScanAge?: string;
+  /**
+   * The window `changedSinceLastScan` actually covers. Reporting one scan's
+   * timestamp next to another scan's change list read as a matched pair and was
+   * not one — "what did I miss" answered confidently and wrongly.
+   */
+  changeWindow?: { from?: string; to: string; scanCount: number };
+  /** True when there is no earlier scan to diff against, so "changed" means "first seen". */
+  firstScan: boolean;
   contracts: { title: string; functions: number; deployedOn: string[] }[];
   /** Every live contract this project is wired to, including external ones. */
   deployments: { alias?: string; network: string; contractId: string; drift?: string; linked: boolean }[];
@@ -559,6 +567,10 @@ export function resumeReport(memory: ProjectMemory, nowIso: string): ResumeRepor
     purpose: memory.project.purpose,
     lastScan: previous?.at ?? last?.at,
     lastScanAge: previous ? humanAge(previous.at, nowIso) : undefined,
+    // `changed` comes from the most recent scan, so the window it covers runs
+    // from the scan before it to that one.
+    changeWindow: last ? { from: previous?.at, to: last.at, scanCount: scans.length } : undefined,
+    firstScan: scans.length < 2,
     contracts: arch.contracts.map((c) => ({
       title: c.node.title,
       functions: c.functions.length,

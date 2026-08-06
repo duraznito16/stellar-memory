@@ -33,6 +33,7 @@ import type {
   ProjectMemory,
   StorageData,
 } from '../core/types.js';
+import { describeAuth } from '../core/query.js';
 import { note, dim } from '../ui/out.js';
 
 export interface McpOptions {
@@ -173,7 +174,19 @@ export async function runMcp(options: McpOptions): Promise<void> {
               name: f.title,
               params: d?.params ?? [],
               returns: d?.returns,
+              // `requires_auth` alone said `true` for the three initializers
+              // that anyone can call and claim admin on. An agent auditing
+              // access control reaches for this tool by name and got the
+              // security-critical answer backwards, so the subject travels with
+              // the boolean and the prose says what the boolean cannot.
               requires_auth: d?.requiresAuth ?? false,
+              authorizes: (d?.authSubjects ?? []).map((s) => ({
+                subject: s.expr,
+                origin: s.origin,
+                storage_key: s.key,
+                gates_callers: s.origin === 'storage' || s.origin === 'guard-macro',
+              })),
+              auth_summary: describeAuth(d).replace(/^ \[|\]$/g, '') || 'no authorization',
             };
           }),
           calls: c.calls.map((n) => n.title),
@@ -268,7 +281,9 @@ export async function runMcp(options: McpOptions): Promise<void> {
             id: node.id,
             name: node.title,
             variants: data?.variants ?? [],
-            disagrees_with_deployed: data?.deployedMismatch,
+            // Always present, so absence never has to be interpreted.
+            deployed_abi_check: data?.deployedCheck ?? 'not-checked',
+            disagrees_with_deployed: data?.deployedMismatch ?? null,
             raised_by: hood?.incoming.filter((i) => i.edge.kind === 'raises').map((i) => i.node.title) ?? [],
           };
         }),
@@ -287,16 +302,24 @@ export async function runMcp(options: McpOptions): Promise<void> {
     async () => {
       const memory = await load();
       const report = resumeReport(memory, new Date().toISOString());
+      const changed = report.changedSinceLastScan.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        title: n.title,
+        path: n.path,
+        // On the first scan everything is "changed" only in the sense of being
+        // seen for the first time. Reporting that as a change history invents a
+        // diff that never happened.
+        reason: report.firstScan || n.firstSeen === n.lastChanged ? 'first-seen' : 'content-changed',
+      }));
+
       return json({
         project: report.project,
         purpose: report.purpose,
-        previous_scan: report.lastScan,
-        changed: report.changedSinceLastScan.map((n) => ({
-          id: n.id,
-          kind: n.kind,
-          title: n.title,
-          path: n.path,
-        })),
+        change_window: report.firstScan
+          ? { note: 'Only one scan exists, so there is nothing to diff against. Everything below is first-seen, not changed.' }
+          : { from: report.changeWindow?.from, to: report.changeWindow?.to, scans_recorded: report.changeWindow?.scanCount },
+        changed,
         open_tasks: report.openTasks.map((t) => ({
           title: t.title,
           path: t.path,
