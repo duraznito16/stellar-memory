@@ -47,12 +47,15 @@ export async function answerWithAi(
   const Anthropic = await loadSdk();
   const model = process.env.STELLAR_MEMORY_MODEL ?? DEFAULT_MODEL;
 
-  // Credentials resolve from ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or a
-  // profile created by `ant auth login` — so do not demand an env var here.
-  const client = new Anthropic();
-  const digest = contextDigest(memory);
-
   try {
+    // Credentials resolve from ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or a
+    // profile created by `ant auth login` — so do not demand an env var here.
+    // Constructed inside the try because the SDK floats on a caret range and
+    // has validated credentials from the constructor before; anything thrown
+    // out here reaches the user as a stack trace instead of the fallback.
+    const client = new Anthropic();
+    const digest = contextDigest(memory);
+
     const response = await client.messages.create({
       model,
       max_tokens: MAX_TOKENS,
@@ -113,10 +116,10 @@ function translate(error: unknown): Error {
   const status = (error as { status?: number })?.status;
   const message = error instanceof Error ? error.message : String(error);
 
-  // Missing credentials fail when the client is constructed, before any request,
-  // so there is no status code to match on. This is the most likely failure of
-  // all — most people run this without a key — and it deserves the instructions
-  // rather than the SDK's internal wording.
+  // With no credentials the SDK throws while it builds the request headers,
+  // before a socket is opened, so this arrives as a plain Error with no status
+  // to match on. It is the most likely failure of all — most people run this
+  // without a key — and it deserves the instructions, not the SDK's wording.
   if (/authentication method|apiKey|authToken/i.test(message) && status === undefined) {
     return new AiUnavailable(
       'No Anthropic credentials found. Set ANTHROPIC_API_KEY, or run `ant auth login`. ' +

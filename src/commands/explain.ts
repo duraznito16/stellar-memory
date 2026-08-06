@@ -37,13 +37,20 @@ export async function runExplain(options: ExplainOptions): Promise<void> {
     try {
       const answer = await answerWithAi(memory, question);
       if (options.json) {
-        out(JSON.stringify(answer, null, 2));
+        // A consumer reading this has no other signal that the prose was
+        // generated rather than looked up.
+        out(JSON.stringify({ ...answer, inferred: true }, null, 2));
         return;
       }
       out();
-      out(answer.text);
+      // The label travels on stdout with the prose it describes, and leads it.
+      // `explain --ai > notes.md` is a designed use of this command, and a file
+      // holding model prose with its attribution stripped off is the one thing
+      // this project exists not to produce. It also has to say *inferred*:
+      // "from the local index" read as though the answer had been retrieved.
+      out(dim(`  Inferred by ${answer.model} from the project digest — generated, not read.`));
       out();
-      note(dim(`  answered by ${answer.model} from the local index`));
+      out(answer.text);
       out();
       return;
     } catch (error) {
