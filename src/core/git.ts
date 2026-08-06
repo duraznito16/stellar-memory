@@ -113,6 +113,9 @@ export function humanAge(fromIso: string, nowIso: string): string {
   const months = Math.floor(days / 30);
   if (months === 1) return 'a month ago';
   if (months < 12) return `${months} months ago`;
-  const years = Math.floor(days / 365);
+  // Years counted from the months, not from a 365-day threshold of their own:
+  // the two units did not meet, and 360 to 364 days fell through both to read as
+  // "0 years ago" — a project untouched for a year announcing itself as current.
+  const years = Math.floor(months / 12);
   return years === 1 ? 'a year ago' : `${years} years ago`;
 }

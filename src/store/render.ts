@@ -17,6 +17,7 @@ import type {
   ProjectMemory,
   StorageData,
 } from '../core/types.js';
+import { missingTtlExtension } from '../core/query.js';
 import { wikilink } from './keys.js';
 
 export interface RenderContext {
@@ -217,7 +218,10 @@ function renderStorage(node: MemoryNode): string {
     `- **Durability:** \`${data.durability}\``,
     `- **Key:** \`${data.key}\``,
   ];
-  if (data.durability !== 'temporary' && !data.hasTtlExtension) {
+  // The same predicate `check --fail-on ttl` gates on. The note used to warn on
+  // any durability but `temporary`, so an instance key showed a ⚠️ that CI
+  // exited 0 on: two artifacts of one index saying opposite things.
+  if (missingTtlExtension(data)) {
     lines.push(
       `- ⚠️ No \`extend_ttl\` call was found for this key. ${data.durability} entries expire once their TTL lapses, and the data becomes unreachable.`,
     );

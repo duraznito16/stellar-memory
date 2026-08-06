@@ -34,6 +34,7 @@ import {
   architecture,
   contextDigest,
   neighbourhood,
+  missingTtlExtension,
   nodesOfKind,
   resumeReport,
   search,
@@ -554,6 +555,9 @@ export async function runMcp(options: McpOptions): Promise<void> {
               key: z.string().optional(),
               durability: z.string().optional(),
               ttl_extended: z.boolean(),
+              can_expire: z
+                .boolean()
+                .describe('The key can archive and become unreachable. This is the question to ask.'),
               source: z.string().optional(),
               read_by: z.array(z.string()),
               written_by: z.array(z.string()),
@@ -585,6 +589,10 @@ export async function runMcp(options: McpOptions): Promise<void> {
             key: data?.key,
             durability: data?.durability,
             ttl_extended: data?.hasTtlExtension ?? false,
+            // The rule about which keys can expire lives in core/query. Three
+            // surfaces restating it is how the window and the CI gate came to
+            // disagree about the same key in the first place.
+            can_expire: data ? missingTtlExtension(data) : false,
             source: node.path,
             read_by:
               hood?.incoming.filter((i) => i.edge.kind === 'reads').map((i) => i.node.title) ?? [],
@@ -593,7 +601,7 @@ export async function runMcp(options: McpOptions): Promise<void> {
           };
         })
         .filter((row) => !durability || row.durability === durability)
-        .filter((row) => !missing_ttl_only || (row.durability === 'persistent' && !row.ttl_extended));
+        .filter((row) => !missing_ttl_only || row.can_expire);
 
       const note =
         rows.length === 0

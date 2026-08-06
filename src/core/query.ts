@@ -101,6 +101,24 @@ const KIND_WEIGHT: Partial<Record<NodeKind, number>> = {
   deployment: 1,
 };
 
+/**
+ * The string values inside a node's payload, without the field names.
+ *
+ * Serialising the payload put the schema into the searchable text: every
+ * `FunctionData` carried `"params"` and `"type"`, so a search for the auth shape
+ * that lets anyone claim admin returned every function in the project, getters
+ * included. A field name says what the index calls something, not what the node
+ * is about.
+ */
+function dataValues(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') out.push(value.toLowerCase());
+  else if (Array.isArray(value)) for (const item of value) dataValues(item, out);
+  else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) dataValues(item, out);
+  }
+  return out;
+}
+
 export function search(memory: ProjectMemory, query: string, limit = 20): SearchHit[] {
   const needle = query.toLowerCase().trim();
   if (!needle) return [];
@@ -115,7 +133,7 @@ export function search(memory: ProjectMemory, query: string, limit = 20): Search
     const title = node.title.toLowerCase();
     const summary = (node.summary ?? '').toLowerCase();
     const pathText = (node.path ?? '').toLowerCase();
-    const dataText = node.data ? JSON.stringify(node.data).toLowerCase() : '';
+    const dataText = node.data ? dataValues(node.data).join(' ') : '';
 
     let score = 0;
     let reason = '';
@@ -133,6 +151,17 @@ export function search(memory: ProjectMemory, query: string, limit = 20): Search
 
     for (const term of terms) {
       if (title.includes(term)) score += 12;
+      // A node names its own kind nowhere else: `DataKey::Admin (instance)` does
+      // not contain "storage", so the most obvious query for a storage key
+      // matched every function that reads one and none of the keys. The plural
+      // is how a person asks for them. Weighted above the summary and below the
+      // name, because this ranks — `search_memory`'s `kind` argument is what
+      // narrows to one kind, and a function that genuinely reads storage is
+      // still an answer here.
+      if (term === node.kind || term === `${node.kind}s`) {
+        score += 8;
+        reason ||= `kind is ${node.kind}`;
+      }
       if (summary.includes(term)) {
         score += 6;
         reason ||= 'mentioned in the summary';
@@ -296,6 +325,23 @@ export interface Signal {
 }
 
 /**
+ * The one TTL rule, so the note a human reads and the gate CI runs cannot
+ * disagree about the same key.
+ *
+ * Instance entries are deliberately out. `instance().extend_ttl(threshold,
+ * extend_to)` names no key — it extends the contract instance as a whole — so
+ * the scanner has no entry to record it against and `hasTtlExtension` is false
+ * on every instance key however diligently the contract extends it. Warning
+ * there is a warning no correct code can clear. The exposure differs too: an
+ * instance entry lapses together with the contract's own code, all at once and
+ * unmissably, where a persistent entry archives on its own and leaves one value
+ * unreachable behind a contract that still answers.
+ */
+export function missingTtlExtension(data: StorageData): boolean {
+  return data.durability === 'persistent' && !data.hasTtlExtension;
+}
+
+/**
  * Facts a returning developer would want flagged, all derived from hard data
  * rather than inference: deployments that no longer match source, persistent
  * storage with no TTL extension, contracts with no tests, unauthenticated
@@ -318,7 +364,7 @@ export function signals(memory: ProjectMemory): Signal[] {
 
   for (const node of nodesOfKind(memory, 'storage')) {
     const data = node.data as unknown as StorageData | undefined;
-    if (data && data.durability === 'persistent' && !data.hasTtlExtension) {
+    if (data && missingTtlExtension(data)) {
       out.push({
         severity: 'warn',
         category: 'ttl',
