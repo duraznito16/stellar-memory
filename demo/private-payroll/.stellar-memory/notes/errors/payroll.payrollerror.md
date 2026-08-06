@@ -5,7 +5,7 @@ title: PayrollError
 path: contracts/payroll/src/lib.rs
 summary: Contract error enum with 4 variants. The discriminants are published ABI.
 first_seen: 2026-08-05T04:15:44.462Z
-last_changed: 2026-08-06T02:27:23.474Z
+last_changed: 2026-08-06T02:37:04.452Z
 tags:
   - stellar-memory
   - kind/error

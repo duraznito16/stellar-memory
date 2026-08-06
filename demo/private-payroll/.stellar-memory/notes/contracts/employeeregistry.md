@@ -5,7 +5,7 @@ title: EmployeeRegistry
 path: contracts/employee-registry/src/lib.rs
 summary: Soroban contract with 4 public functions.
 first_seen: 2026-08-04T23:23:28.099Z
-last_changed: 2026-08-06T02:27:23.474Z
+last_changed: 2026-08-06T02:37:04.452Z
 tags:
   - stellar-memory
   - kind/contract
@@ -25,12 +25,7 @@ Soroban contract with 4 public functions.
 - `remove(env: Env, employee: Address)`  🔒 requires auth — [[functions/employeeregistry.remove|remove]]
 - `salary_of(env: Env, employee: Address) -> i128` — [[functions/employeeregistry.salary_of|salary_of]]
 
-**Local Wasm hash:** `92065fb36f832750f5b6b1144e1731ef6fab5e47e80009c7bb6742fc3c3c497b`
-
 ## Connections
-
-**Deployed as**
-- [[deployments/testnet.ca2uqyd63jwh5mxvemtpiweqz2eq7dlbumzrowtkbn5uflycl7o2twrn|employee-registry @ testnet]]
 
 **Defined in**
 - [[crates/employee-registry|employee-registry]]
@@ -51,7 +46,6 @@ Soroban contract with 4 public functions.
 <details><summary>Where this came from</summary>
 
 - Parsed from `contracts/employee-registry/src/lib.rs:12`
-- Reported by `stellar contract info hash --wasm target/wasm32v1-none/release/employee_registry.wasm` (ground truth)
 
 </details>
 <!-- /stellar-memory:auto -->
