@@ -6,6 +6,9 @@ import { renderGraphHtml } from '../store/html.js';
 import type { DeploymentData, MemoryNode, ProjectMemory } from '../core/types.js';
 import { out, note, success, warn, dim, bold, cyan, green, yellow, heading } from '../ui/out.js';
 
+/** Where the page lands when no destination was given. Shared with `ui --once`. */
+export const HTML_FILE = 'stellar-memory-graph.html';
+
 export interface GraphOptions {
   cwd: string;
   format?: string;
@@ -55,7 +58,7 @@ export async function runGraph(options: GraphOptions): Promise<void> {
       await emit(JSON.stringify({ nodes: memory.nodes, edges: memory.edges }, null, 2), 'graph.json');
       return;
     case 'html':
-      await emit(renderGraphHtml(memory, signals(memory)), 'stellar-memory-graph.html');
+      await emit(renderGraphHtml(memory, signals(memory)), HTML_FILE);
       return;
     default:
       renderTree(memory);

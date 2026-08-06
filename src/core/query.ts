@@ -287,6 +287,12 @@ export interface Signal {
   category: SignalCategory;
   message: string;
   nodeId?: string;
+  /**
+   * The finding is about the project rather than about any one node, so it
+   * carries no `nodeId`. Marking it is what stops a reader treating the absence
+   * as missing data and pinning it to whichever node happened to come first.
+   */
+  scope?: 'project';
 }
 
 /**
@@ -450,7 +456,10 @@ export function signals(memory: ProjectMemory): Signal[] {
       message:
         `Every test module calls mock_all_auths, which disables authorization in the test ` +
         `environment. The access control on ${names} is therefore never exercised by the suite.`,
-      nodeId: ungated[0]?.node.id,
+      // One observation about the project's testing practice. It used to carry
+      // the first contract's id, which drew a warning ring on that contract
+      // alone — so the picture said one contract while the sentence said three.
+      scope: 'project',
     });
   }
 

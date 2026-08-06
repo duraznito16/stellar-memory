@@ -14,6 +14,7 @@ import { runScan } from './commands/scan.js';
 import { runResume } from './commands/resume.js';
 import { runExplain } from './commands/explain.js';
 import { runGraph } from './commands/graph.js';
+import { runUi } from './commands/ui.js';
 import { runCheck } from './commands/check.js';
 import { runMcp } from './commands/mcp.js';
 
@@ -69,6 +70,15 @@ program
   .action(async (opts) => runGraph({ ...globals(), ...opts }));
 
 program
+  .command('ui')
+  .description('open the graph in a window and keep it current')
+  .option('-p, --port <number>', 'serve on this port instead of one chosen for you', toPort)
+  .option('--no-open', 'print the address without opening a window')
+  .option('--watch', 're-scan offline when a Rust source changes', false)
+  .option('--once', 'write the self-contained file and open that, with no server', false)
+  .action(async (opts) => runUi({ ...globals(), ...opts }));
+
+program
   .command('check')
   .description('fail with a non-zero exit code when the project has blocking issues (for CI)')
   .option(
@@ -88,6 +98,15 @@ program
 function globals(): { cwd: string } {
   const opts = program.opts<{ cwd: string }>();
   return { cwd: opts.cwd ?? process.cwd() };
+}
+
+/** A port that is not a port must fail here, not as a confusing listen error. */
+function toPort(raw: string): number {
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error(`--port needs a whole number from 0 to 65535, not "${raw}".`);
+  }
+  return port;
 }
 
 program.parseAsync(process.argv).catch((error: unknown) => {

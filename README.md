@@ -88,6 +88,7 @@ The same knowledge graph serves a human and an agent.
 ```bash
 stellar memory resume                       # get your context back
 stellar memory explain "how does pay work?" # ask
+stellar memory ui                           # look at it, and keep looking
 stellar memory graph --format mermaid       # paste the map into a PR
 ```
 
@@ -187,18 +188,36 @@ node scripts/mcp-call.mjs describe_node '{"id":"contract:Payroll"}'
 ![The demo project as a graph: three contracts, their storage, and what is live on testnet](docs/media/graph.png)
 
 ```bash
+stellar memory ui
+```
+
+Opens the graph in a window and keeps it current: the contracts, what they call,
+the storage they touch, and what is live on chain. Click any node for its source
+location, its relationships, and any findings against it. Nodes with something
+worth knowing carry a ring, and the findings are listed beside the picture so a
+reader gets them without clicking; colour never carries the meaning on its own.
+
+The window reloads itself whenever the memory changes, so a scan in another
+terminal is on screen a moment later. Add `--watch` and editing a contract is
+enough — a Rust save triggers an offline rescan, and the picture follows the
+code. It says so when a rescan fails, because a graph that is quietly older than
+the source is worse than no graph.
+
+It serves from `127.0.0.1` and refuses any request that did not come from
+itself, which matters because what it publishes is a map of your source tree and
+conference Wi-Fi is not your machine. Nothing is written to the project: the page
+is a string in memory, so `--watch` cannot end up watching its own output.
+
+```bash
 stellar memory graph --format html
 ```
 
-Writes one self-contained HTML file — no server, no build, no network — showing
-the contracts, what they call, the storage they touch, and what is live on
-chain. Click any node for its source location, its relationships, and any
-findings against it. Nodes with something worth knowing carry a ring, and the
-panel says what it is; colour never carries the meaning on its own.
-
-It is deterministic: the same memory produces the same file, so it diffs in git
-next to the vault it describes, and it can be committed or attached to a pull
-request.
+The same picture as one self-contained file — no server, no build, no network.
+Use it for the copy that outlives the session: it is deterministic, so it diffs
+in git next to the vault it describes, and it can be committed or attached to a
+pull request. The written file carries no reference to a server, so it still
+works months later on a machine where nothing is listening. `stellar memory ui
+--once` writes that same file and opens it.
 
 ## The vault is a folder of Markdown
 
@@ -245,6 +264,7 @@ full source-level memory, just not the on-chain half.
 | `scan` | Analyse the repo and update the memory. Creates the vault if there isn't one. `--offline` skips all network and CLI calls |
 | `resume` | Recover context: what this is, what moved, what is pending |
 | `explain [question]` | Ask about the project. `--ai` for a written answer |
+| `ui` | Open the graph in a window and keep it current. `--watch` rescans offline on a Rust edit; `--once` writes the standalone file instead. Binds `127.0.0.1` only |
 | `graph` | Show how it fits together — `tree`, `mermaid`, `dot`, `json`, or `html` |
 | `check` | Exit non-zero when the project has blocking issues. For CI |
 | `mcp` | Serve the memory to agents over MCP (stdio) |

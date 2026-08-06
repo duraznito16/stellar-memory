@@ -9,6 +9,11 @@ export interface ScanOptions {
   offline?: boolean;
   network?: string[];
   quiet?: boolean;
+  /**
+   * Print the block of totals at the end. `ui --watch` scans on every save, and
+   * a dozen lines per keystroke buries whatever the terminal was there to say.
+   */
+  summary?: boolean;
 }
 
 export async function runScan(options: ScanOptions): Promise<void> {
@@ -37,6 +42,8 @@ export async function runScan(options: ScanOptions): Promise<void> {
 
   const last = memory.scans[memory.scans.length - 1];
   const changed = last?.changed.length ?? 0;
+
+  if (options.summary === false) return;
 
   out();
   success(
