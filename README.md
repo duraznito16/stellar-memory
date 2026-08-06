@@ -212,6 +212,28 @@ full source-level memory, just not the on-chain half.
 | `mcp` | Serve the memory to agents over MCP (stdio) |
 | `init` | Create the vault explicitly. `--with-agents` also scaffolds the agent team |
 
+## Keeping it current
+
+A memory nobody refreshes goes stale, and a stale memory is worse than none —
+it still reads as current. Three levels, pick one:
+
+| | |
+|---|---|
+| **Manual** | `stellar memory scan` |
+| **Reminded** | `resume` says so when the memory was built at a different commit than `HEAD` |
+| **Automatic** | a `post-commit` hook |
+
+The offline scan takes about a third of a second, which is small enough to sit in
+a commit hook unnoticed:
+
+```bash
+cp node_modules/soroban-memory/templates/hooks/post-commit .git/hooks/
+chmod +x .git/hooks/post-commit
+```
+
+It is offline by design — a commit hook must never wait on the network — and it
+can never fail a commit that already happened. The on-chain half belongs in CI.
+
 ## In CI
 
 ```bash

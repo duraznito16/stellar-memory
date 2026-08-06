@@ -7,6 +7,7 @@
  */
 
 import { Command } from 'commander';
+import { VERSION } from './core/version.js';
 import { fail } from './ui/out.js';
 import { runInit } from './commands/init.js';
 import { runScan } from './commands/scan.js';
@@ -25,7 +26,7 @@ program
       'Scans a repository, links its contracts to what is actually deployed,\n' +
       'and answers questions about it — for you and for your agents.',
   )
-  .version('0.1.0')
+  .version(VERSION)
   .option('-C, --cwd <dir>', 'run as if started in <dir>', process.cwd());
 
 program

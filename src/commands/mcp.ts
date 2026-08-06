@@ -40,7 +40,8 @@ export interface McpOptions {
   cwd: string;
 }
 
-const VERSION = '0.1.0';
+// Reported to every agent that connects, so it must not be a stale literal.
+import { VERSION } from '../core/version.js';
 
 export async function runMcp(options: McpOptions): Promise<void> {
   const root = path.resolve(options.cwd);

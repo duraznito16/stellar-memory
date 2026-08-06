@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Keep the project memory current, automatically.
+#
+# Install:
+#   cp node_modules/soroban-memory/templates/hooks/post-commit .git/hooks/
+#   chmod +x .git/hooks/post-commit
+#
+# An offline scan of a three-contract workspace takes about a third of a second,
+# which is small enough to sit in a commit hook without anyone noticing. That
+# matters more than it sounds: a memory nobody remembers to refresh is a memory
+# that quietly goes stale, and a stale memory is worse than none because it still
+# reads as current.
+#
+# Deliberately offline. A commit hook must never wait on the network, and the
+# on-chain half belongs in CI where a slow or unreachable RPC does not block
+# someone's work.
+#
+# Deliberately non-fatal. Nothing here may fail a commit that has already
+# happened: the code is committed either way, and a broken hook that rejects
+# work is far worse than a memory one scan behind.
+
+command -v stellar-memory >/dev/null 2>&1 || exit 0
+
+# `|| true` so a scan failure never surfaces as a hook failure.
+stellar-memory scan --offline --quiet >/dev/null 2>&1 || true
+
+# Stage the refreshed vault alongside the commit that changed the code, so the
+# memory and the source it describes move together in history. Amending is safe
+# here: post-commit runs after the commit object exists, and --no-verify avoids
+# re-entering this hook.
+if [ -d .stellar-memory ] && ! git diff --quiet -- .stellar-memory 2>/dev/null; then
+  git add .stellar-memory >/dev/null 2>&1 || exit 0
+  git commit --amend --no-edit --no-verify >/dev/null 2>&1 || true
+fi
+
+exit 0
