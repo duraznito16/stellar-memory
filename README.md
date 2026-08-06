@@ -185,7 +185,7 @@ node scripts/mcp-call.mjs describe_node '{"id":"contract:Payroll"}'
 
 ## See it
 
-![The demo project as a graph: three contracts, their storage, and what is live on testnet](docs/media/graph.png)
+![The live window: three contracts and their storage as a graph, with all six findings named beside it — the TTL warning on DataKey::LastPaid, four authorization findings, and one project-wide test finding](docs/media/ui-live.png)
 
 ```bash
 stellar memory ui
@@ -244,6 +244,224 @@ That split is the point. Structural facts stay current automatically; the
 reasoning that source code cannot hold — why this design, what was tried and
 rejected — is written once and kept forever. When a contract disappears, its
 note is **marked stale, never deleted**.
+
+---
+
+# How it works
+
+## One index, three readers
+
+There is exactly one place where knowledge lives, and everything else reads it.
+No surface has a private cache, so a human, an agent and a window can never
+disagree about the same project.
+
+```mermaid
+flowchart TB
+    subgraph inputs["What it reads"]
+        RS["Rust sources<br/>contract and impl macros"]
+        CT["Cargo.toml<br/>workspace members"]
+        GIT["git<br/>HEAD, log, dates"]
+        MD["Markdown<br/>README, docs/, TODOs"]
+        NET["Stellar CLI<br/>read-only RPC"]
+    end
+
+    subgraph engine["Analysis"]
+        SCAN["scanner/<br/>parse and correlate"]
+        GRAPH["ProjectMemory<br/>nodes + edges"]
+    end
+
+    VAULT[(".stellar-memory/<br/>index.json + notes/*.md")]
+
+    subgraph readers["Three front doors"]
+        CLI["CLI<br/>resume · explain · check"]
+        MCP["MCP server<br/>8 tools over stdio"]
+        UI["Live window<br/>HTTP + SSE"]
+    end
+
+    RS --> SCAN
+    CT --> SCAN
+    GIT --> SCAN
+    MD --> SCAN
+    NET -.->|"skipped by --offline"| SCAN
+    SCAN --> GRAPH --> VAULT
+    VAULT --> CLI
+    VAULT --> MCP
+    VAULT --> UI
+```
+
+The dotted edge is the whole reason `--offline` exists: everything above it is
+deterministic and works on a plane, and only the network half can be slow,
+absent, or reset by someone else.
+
+## The scan pipeline
+
+`scan` is a single pass with a deliberate ordering. Three of these stages exist
+because doing them in the obvious order produced wrong answers.
+
+```mermaid
+flowchart TD
+    A["walkRepo<br/>respects .gitignore"] --> B["parse Cargo workspace<br/>crate roots and deps"]
+    B --> C["PASS 1 — collect free functions<br/>per crate, before analysing any file"]
+    C --> D["PASS 2 — analyse each .rs<br/>contracts, fns, storage, auth,<br/>errors, events, call sites"]
+    D --> E["link cross-contract calls<br/>resolve contractimport! and Client types"]
+    E --> F["index tests, docs, scripts, tasks"]
+    F --> G["read git — HEAD, last commit"]
+    G --> H{"--offline?"}
+    H -->|yes| J
+    H -->|no| I["enrich on-chain<br/>aliases · Wasm hash · meta · spec"]
+    I --> J["reconcile with previous scan<br/>firstSeen · lastChanged · stale"]
+    J --> K["render vault<br/>index.json + one note per node"]
+```
+
+**Why two passes over the Rust.** Soroban crates are module-scoped: `mod balance;`
+puts helper functions in a sibling file. A contract whose storage lives in
+`admin.rs` / `balance.rs` / `allowance.rs` — the canonical token layout — appears
+to touch no storage at all if you analyse files one at a time. Pass 1 gathers
+every crate's free functions first; pass 2 can then follow a call into a sibling
+module and attribute the storage it touches.
+
+**Why call linking is its own stage.** A `calls` edge runs from a *function* to a
+*contract*, and the target contract may be parsed after the caller. Emitting the
+edge during the file loop drops every call whose target appears later in the walk.
+
+**Why reconciliation is last.** `firstSeen` and `lastChanged` are computed by
+fingerprinting each node against the previous scan. It has to see the finished
+graph, and it is what makes `recent_changes` a diff rather than a listing.
+
+## What is in the graph
+
+16 node kinds and 12 edge kinds, all derived from structure — never from a name.
+
+| Node kind | What proves it exists |
+|---|---|
+| `contract` | a Rust type annotated `#[contract]` |
+| `function` | a `pub fn` inside a `#[contractimpl]` block |
+| `type` / `error` / `event` | `#[contracttype]`, `#[contracterror]`, `#[contractevent]` or a published topic |
+| `storage` | a distinct key written to instance, persistent or temporary storage |
+| `deployment` | a live contract ID, resolved through a committed alias |
+| `asset` | a token or SAC client this project moves value through |
+| `crate` · `module` · `test` · `script` · `doc` | Cargo members, sources, test modules, build scripts, Markdown |
+| `task` · `decision` | pending work found in the tree; human-written rationale |
+
+| Edge kind | Meaning |
+|---|---|
+| `defines` | structural containment — crate defines contract defines function |
+| `calls` | a cross-contract call, evidenced by `contractimport!` or a generated `Client` |
+| `reads` / `writes` | a function touches a storage key |
+| `emits` / `raises` | a function publishes an event or can return an error variant |
+| `deployed_as` | source contract ↔ live instance on a network |
+| `tests` / `deploys` / `depends_on` | coverage, build scripts, Cargo dependencies |
+
+The rule the whole design serves: **a false positive is worse than a missing
+feature.** Every edge is evidence. `Payroll → Treasury` exists because the
+generated client type and the address it is constructed from were both found, not
+because two contracts share a word.
+
+## How the live window stays current
+
+`ui` holds the page in memory and never writes to your project. That is not
+frugality — it is what makes `--watch` safe, because a renderer that wrote a file
+would be watching its own output.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant You
+    participant CLI as stellar memory ui --watch
+    participant HTTP as server on 127.0.0.1
+    participant Win as browser window
+
+    CLI->>HTTP: listen host 127.0.0.1, port 0
+    CLI->>Win: spawn Chromium in app mode, detached
+    Win->>HTTP: GET / — Host, Origin, Sec-Fetch-Site checked
+    HTTP-->>Win: the page, with a CSP header
+    Win->>HTTP: GET /events — SSE
+    HTTP-->>Win: retry 500 · event hello · data stamp
+
+    You->>CLI: save contracts/payroll/src/lib.rs
+    Note over CLI: debounce 300ms, then one scan at a time
+    CLI->>HTTP: announce 'scanning'
+    HTTP-->>Win: event: scanning
+    CLI->>CLI: offline rescan (~0.3s) writes the vault
+    CLI->>HTTP: announce 'scanned'
+    HTTP->>HTTP: re-render, hash {project, nodes, edges, signals}
+    alt stamp changed
+        HTTP-->>Win: event: reload
+        Win->>HTTP: GET / again
+    else drawing identical
+        Note over HTTP,Win: nothing sent — no flash on stage
+    end
+```
+
+Four details that are load-bearing:
+
+- **The stamp hashes the drawing, not the memory.** Every scan appends a record to
+  `memory.scans`, so hashing the whole memory reloads the window on every save
+  even when the picture is unchanged. On a projector that reads as a flicker with
+  no cause.
+- **A failed rescan says so.** `scan-failed` is its own event. The window keeps
+  the last graph that worked and stops claiming to be live — a graph quietly older
+  than the source is worse than no graph.
+- **Shutdown ends the streams first.** An open SSE response is an *active* request,
+  so `server.close()` alone waits on it forever and Ctrl+C appears to hang. The
+  order is: send `bye`, end each stream, `close()`, then sweep stragglers 250ms
+  later. Verified end to end: exit code 0, ~15ms, one interrupt.
+- **The committed artifact never learns about the server.** `live` is a render
+  option, off by default, so `graph --format html` is byte-identical with or
+  without the window feature and carries no localhost reference. A test asserts it.
+
+### What the window will not do
+
+It binds `127.0.0.1` and nothing else — there is one `listen` call and no host
+field on its options type, so no caller can widen it. It answers exactly two
+routes, both string literals, and no request-derived value reaches a filesystem
+call, so there is no path to traverse. Foreign `Host`, foreign `Origin`, and
+cross-site `Sec-Fetch-Site` are refused, which is what stops a web page from
+reading your source map over DNS rebinding.
+
+What it publishes is a map of your private tree, and conference Wi-Fi is not your
+machine.
+
+## The module map
+
+```
+src/
+  scanner/     rust.ts     1144   Soroban source analysis — the hard part
+               scan.ts     1191   graph construction and correlation
+               cargo.ts     126   workspace parsing
+               walk.ts      106   gitignore-aware file walk
+  core/        query.ts     685   signals, search, resume, neighbourhoods
+               types.ts     247   the graph model
+               git.ts       118   HEAD, last commit, dates
+  stellar/     cli.ts       262   read-only Stellar CLI bridge
+               spec.ts      140   SCSpecEntry → functions, errors, events
+  store/       html.ts      915   the self-contained page and the live page
+               render.ts    380   Markdown notes
+               vault.ts     215   read/write .stellar-memory/
+  ui/          serve.ts     353   loopback HTTP + SSE hub + shutdown
+               watch.ts     249   debounced, non-overlapping watchers
+               open.ts      242   cross-platform window launcher
+  commands/    mcp.ts       338   the 8 agent-facing tools
+               ui.ts        206   wiring for the live window
+               graph.ts     200   tree, mermaid, dot, json, html
+```
+
+`rust.ts` and `scan.ts` are 40% of the codebase because the claim this tool makes
+is that its facts are true. Everything else reads what they produce.
+
+## The committable artifact
+
+The window is for working; the file is for the record.
+
+![The same graph written as one self-contained HTML file, with the project-wide finding beside it](docs/media/graph-file.png)
+
+```bash
+stellar memory graph --format html
+```
+
+Deterministic, so it diffs in git next to the vault it describes. `stellar memory
+ui --once` writes that same file and opens it — the output is md5-identical, which
+a test enforces.
 
 ## Install
 
@@ -348,6 +566,44 @@ node dist/index.js --cwd demo/private-payroll resume
 
 The badge above is not just "the tests pass". Every push runs the tool against
 the demo Soroban workspace and asserts what it claims:
+
+```mermaid
+flowchart LR
+    P(["push / PR"])
+
+    subgraph T["test · Node 24"]
+        T1["54 unit tests"]
+    end
+    subgraph D["dogfood · Node 20"]
+        D1["scan the demo offline"] --> D2["gate fires on a real failure"]
+        D2 --> D3["gate stays quiet when clean"]
+        D3 --> D4["typo exits 2, never 0"]
+    end
+    subgraph C["contracts · Node 20 + Rust"]
+        C1["cargo build for wasm32"] --> C2["read the spec back<br/>out of the compiled Wasm"]
+        C2 --> C3["parser output equals compiler spec"]
+    end
+    subgraph O["onchain · continue-on-error"]
+        O1["scan against testnet"] --> O2["compare Wasm hashes"]
+    end
+
+    P --> T1
+    P --> D1
+    P --> C1
+    P --> O1
+
+    M{{"merge"}}
+    T1 --> M
+    D4 --> M
+    C3 --> M
+    O2 -.->|"never blocks"| M
+```
+
+The job worth understanding is `contracts`: the demo is compiled to Wasm, the
+Stellar CLI reads the spec back out of the binary, and the functions the analyser
+reported are compared against it. That is **static analysis validated against
+`rustc`**, not against opinion — and it is the reason the graph can be trusted.
+
 
 - **The parser agrees with the compiler.** The demo is built to Wasm, and the
   public functions the analyser reports are compared against the spec embedded
