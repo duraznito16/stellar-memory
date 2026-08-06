@@ -94,11 +94,21 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
     return full;
   };
 
+  // Scanning the array for every insertion is quadratic, and a mid-sized
+  // workspace pushes tens of thousands of edges.
+  //
+  // On a storage edge the note is the operator, and the operator is the fact:
+  // `reads` noted `has` is the re-initialization guard `signals()` looks for, so
+  // dropping it because a `get` on the same key was seen first reports correctly
+  // guarded code as unguarded. Elsewhere the note explains a relationship the
+  // pair already asserts, and a second edge would only draw the same line twice.
+  const edgeKeys = new Set<string>();
   const addEdge = (edge: MemoryEdge) => {
-    const dup = edges.some(
-      (e) => e.from === edge.from && e.to === edge.to && e.kind === edge.kind,
-    );
-    if (!dup) edges.push(edge);
+    const carriesOp = edge.kind === 'reads' || edge.kind === 'writes';
+    const key = [edge.from, edge.to, edge.kind, carriesOp ? edge.note ?? '' : ''].join('\u0000');
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push(edge);
   };
 
   /* ---------------------------------------------------------------- *
@@ -178,10 +188,8 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
    * ---------------------------------------------------------------- */
   progress(`Analysing ${rustFiles.length} Rust file${rustFiles.length === 1 ? '' : 's'}`);
   const analyses: RustFileAnalysis[] = [];
-  /** contract name -> the crate it belongs to, for later Wasm lookup. */
+  /** contract node id -> the crate it belongs to, for later Wasm lookup. */
   const contractCrate = new Map<string, string>();
-  /** module name used in `contractimport!` -> importing contract. */
-  const importsByFile = new Map<string, RustFileAnalysis>();
 
   // Rust modules are crate-scoped: `mod balance;` puts helper functions in a
   // sibling file. Gather every crate's free functions before analysing any file,
@@ -196,17 +204,47 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
 
     const crateKey = crateForPath(file.rel)?.dir ?? '.';
     const bucket = helpersByCrate.get(crateKey) ?? new Map<string, HelperFn>();
-    for (const [name, helper] of collectHelpersFrom(source)) bucket.set(name, helper);
+    for (const [name, helper] of collectHelpersFrom(source, file.rel)) bucket.set(name, helper);
     helpersByCrate.set(crateKey, bucket);
   }
 
+  const analysisByFile = new Map<string, RustFileAnalysis>();
   for (const file of rustFiles) {
     const source = sources.get(file.rel);
     if (!source) continue;
     const crateKey = crateForPath(file.rel)?.dir ?? '.';
     const analysis = analyseRustFile(file.rel, source, helpersByCrate.get(crateKey));
     analyses.push(analysis);
-    importsByFile.set(file.rel, analysis);
+    analysisByFile.set(file.rel, analysis);
+  }
+
+  // `stellar contract init` calls the struct it generates `Contract`, so a
+  // two-crate workspace holds two `#[contract] pub struct Contract;`. Under one
+  // id they merged into a single node carrying the last file's crate and path,
+  // both interfaces as one function list, and a `defines` edge from each crate.
+  //
+  // Only a name a second crate also claims is qualified. An id is the name of a
+  // vault note and the target of every wikilink to it, so qualifying
+  // unconditionally would rename every note in every existing vault and reset
+  // the firstSeen it had accumulated; `registerNoteKeys` disambiguates note
+  // names on the same terms, and for the same reason.
+  const cratesByContract = new Map<string, Set<string>>();
+  for (const analysis of analyses) {
+    const crate = crateForPath(analysis.rel)?.name ?? 'unknown';
+    for (const decl of analysis.contracts) {
+      const claimed = cratesByContract.get(decl.name) ?? new Set<string>();
+      cratesByContract.set(decl.name, claimed.add(crate));
+    }
+  }
+  /** The id segment a contract's own nodes hang off: `Payroll`, or `a.Contract`. */
+  const qualify = (rel: string, name: string): string =>
+    (cratesByContract.get(name)?.size ?? 0) > 1
+      ? `${crateForPath(rel)?.name ?? 'unknown'}.${name}`
+      : name;
+
+  for (const file of rustFiles) {
+    const analysis = analysisByFile.get(file.rel);
+    if (!analysis) continue;
 
     const crate = crateForPath(file.rel);
     const fileProv: Provenance[] = [{ source: 'source', file: file.rel }];
@@ -239,7 +277,8 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
     }
 
     for (const contract of analysis.contracts) {
-      const contractId = `contract:${contract.name}`;
+      const local = qualify(file.rel, contract.name);
+      const contractId = `contract:${local}`;
       const data: ContractData = {
         crate: crate?.name ?? 'unknown',
         functions: contract.functions.map((f) => f.name),
@@ -258,7 +297,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
         provenance: [{ source: 'source', file: file.rel, line: contract.line }],
       });
       if (crate?.name) {
-        contractCrate.set(contract.name, crate.name);
+        contractCrate.set(contractId, crate.name);
         addEdge({
           from: `crate:${crate.name}`,
           to: contractId,
@@ -268,7 +307,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
       }
 
       for (const fn of contract.functions) {
-        const fnId = `function:${contract.name}.${fn.name}`;
+        const fnId = `function:${local}.${fn.name}`;
         const fnData: FunctionData = {
           params: fn.params,
           returns: fn.returns,
@@ -299,7 +338,11 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
           // present it to an agent as a real storage key.
           if (!access.key) continue;
           const key = access.key;
-          const storageId = `storage:${contract.name}.${access.durability}.${key}`;
+          const storageId = `storage:${local}.${access.durability}.${key}`;
+          // Where the access was written, which is not always the file being
+          // walked: an entry point in a 30-line `lib.rs` folds in a helper from
+          // line 87 of `balance.rs`, and `lib.rs:87` cites code that is not there.
+          const at = access.file ?? file.rel;
           const existing = nodes.get(storageId)?.data as unknown as StorageData | undefined;
           const storageData: StorageData = {
             durability: access.durability,
@@ -310,10 +353,10 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
             id: storageId,
             kind: 'storage',
             title: `${key} (${access.durability})`,
-            path: file.rel,
+            path: at,
             line: access.line,
             data: storageData as unknown as Record<string, unknown>,
-            provenance: [{ source: 'source', file: file.rel, line: access.line }],
+            provenance: [{ source: 'source', file: at, line: access.line }],
           });
           // Re-apply, because addNode merges rather than replaces.
           const node = nodes.get(storageId)!;
@@ -334,7 +377,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
             to: storageId,
             kind,
             note: `\`${access.op}\``,
-            provenance: [{ source: 'source', file: file.rel, line: access.line }],
+            provenance: [{ source: 'source', file: at, line: access.line }],
           });
         }
 
@@ -395,7 +438,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
         }
 
         for (const topic of fn.events) {
-          const eventId = `event:${contract.name}.${topic}`;
+          const eventId = `event:${local}.${topic}`;
           addNode({
             id: eventId,
             kind: 'event',
@@ -463,7 +506,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
   /* ---------------------------------------------------------------- *
    * 4. Cross-contract calls
    * ---------------------------------------------------------------- */
-  linkCrossContractCalls(analyses, nodes, addEdge, contractCrate);
+  linkCrossContractCalls(analyses, nodes, addEdge, contractCrate, qualify);
 
   /* ---------------------------------------------------------------- *
    * 5. Tests, docs, scripts, tasks
@@ -479,12 +522,14 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
    * ---------------------------------------------------------------- */
   const networks = options.networks ?? ['testnet', 'mainnet'];
   let deploymentCount = 0;
+  let enriched = false;
   if (options.online) {
     const version = await stellarVersion();
     if (!version) {
       warnings.push('The `stellar` CLI was not found on PATH, so no on-chain data was collected.');
     } else {
       progress(`Checking deployments via ${version}`);
+      enriched = true;
       deploymentCount = await enrichOnChain({
         root,
         networks,
@@ -497,6 +542,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
       });
     }
   }
+  if (!enriched) carryOnChain(options.previous ?? null, nodes, addEdge);
 
   /* ---------------------------------------------------------------- *
    * 7. Project node and bookkeeping
@@ -576,30 +622,6 @@ function normaliseName(name: string): string {
 }
 
 /**
- * Resolve a client name to a contract node, trying the name itself, the crate
- * that produced it, and the `Contract` suffix convention.
- */
-function resolveContractByName(
-  client: string,
-  nodes: Map<string, MemoryNode>,
-  contractCrate: Map<string, string>,
-): string | undefined {
-  const byName = new Map<string, string>();
-  for (const node of nodes.values()) {
-    if (node.kind !== 'contract') continue;
-    byName.set(normaliseName(node.title), node.id);
-    const crate = contractCrate.get(node.title);
-    if (crate) byName.set(normaliseName(crate), node.id);
-  }
-  const norm = normaliseName(client);
-  return (
-    byName.get(norm) ??
-    byName.get(norm.replace(/(contract|client)$/, '')) ??
-    byName.get(`${norm}contract`)
-  );
-}
-
-/**
  * Resolve `contractimport!` modules and generated clients to real contract nodes.
  * This is what turns a pile of crates into an architecture diagram.
  *
@@ -614,20 +636,27 @@ function linkCrossContractCalls(
   nodes: Map<string, MemoryNode>,
   addEdge: AddEdge,
   contractCrate: Map<string, string>,
+  qualify: (rel: string, name: string) => string,
 ): void {
   const byName = new Map<string, string>();
   for (const node of nodes.values()) {
     if (node.kind !== 'contract') continue;
     byName.set(normaliseName(node.title), node.id);
-    const crate = contractCrate.get(node.title);
+    const crate = contractCrate.get(node.id);
     if (crate) byName.set(normaliseName(crate), node.id);
   }
 
   const lookup = (name: string): string | undefined => {
     const norm = normaliseName(name);
+    // An empty name is not a name. Without this, the suffix route asked for
+    // `'' + 'contract'` and matched whatever `stellar contract init` had called
+    // `Contract`, so an import with no module around it handed every contract in
+    // the file a dependency on it that nothing in the source says exists.
+    if (!norm) return undefined;
+    const stripped = norm.replace(/(contract|client)$/, '');
     return (
       byName.get(norm) ??
-      byName.get(norm.replace(/(contract|client)$/, '')) ??
+      (stripped ? byName.get(stripped) : undefined) ??
       byName.get(`${norm}contract`)
     );
   };
@@ -650,7 +679,8 @@ function linkCrossContractCalls(
     };
 
     for (const contract of analysis.contracts) {
-      const fromId = `contract:${contract.name}`;
+      const local = qualify(analysis.rel, contract.name);
+      const fromId = `contract:${local}`;
       if (!nodes.has(fromId)) continue;
 
       for (const fn of contract.functions) {
@@ -673,7 +703,7 @@ function linkCrossContractCalls(
         //
         // It has to happen here rather than while walking files: a contract in a
         // later file does not exist as a node yet when its caller is parsed.
-        const fnId = `function:${contract.name}.${fn.name}`;
+        const fnId = `function:${local}.${fn.name}`;
         if (!nodes.has(fnId)) continue;
         for (const call of fn.contractCalls) {
           if (call.kind !== 'generated') continue;
@@ -704,7 +734,7 @@ function linkCrossContractCalls(
       const target = resolve(imp.module ?? '') ?? resolveWasm(imp.wasmFile, lookup);
       if (!target) continue;
       for (const contract of analysis.contracts) {
-        const fromId = `contract:${contract.name}`;
+        const fromId = `contract:${qualify(analysis.rel, contract.name)}`;
         if (!nodes.has(fromId) || fromId === target) continue;
         addEdge({
           from: fromId,
@@ -948,10 +978,11 @@ async function enrichOnChain(args: EnrichArgs): Promise<number> {
   const { root, networks, nodes, addNode, addEdge, contractCrate, warnings, progress } = args;
 
   // Local Wasm hashes first, so drift can be computed without a second pass.
+  // Keyed by node id: two crates may hold a contract of the same name.
   const localHash = new Map<string, string>();
   for (const node of nodes.values()) {
     if (node.kind !== 'contract') continue;
-    const crate = contractCrate.get(node.title);
+    const crate = contractCrate.get(node.id);
     if (!crate) continue;
     for (const candidate of [wasmArtifactPath(crate), legacyWasmArtifactPath(crate)]) {
       const abs = path.join(root, candidate);
@@ -962,7 +993,7 @@ async function enrichOnChain(args: EnrichArgs): Promise<number> {
       }
       const hash = await fetchWasmHash({ wasm: abs });
       if (hash) {
-        localHash.set(node.title, hash);
+        localHash.set(node.id, hash);
         const data = node.data as unknown as ContractData;
         data.wasmPath = candidate;
         data.localWasmHash = hash;
@@ -1029,14 +1060,14 @@ async function recordDeployment(
   for (const node of nodes.values()) {
     if (node.kind !== 'contract') continue;
     const byName = node.title.toLowerCase().replace(/contract$/, '') === alias.alias.toLowerCase().replace(/-/g, '');
-    const byHash = onChainHash && localHash.get(node.title) === onChainHash;
+    const byHash = onChainHash && localHash.get(node.id) === onChainHash;
     if (byName || byHash) {
       matched = node;
       break;
     }
   }
 
-  const local = matched ? localHash.get(matched.title) : undefined;
+  const local = matched ? localHash.get(matched.id) : undefined;
   const drift: DeploymentData['drift'] =
     !onChainHash || !local ? 'unknown' : onChainHash === local ? 'in-sync' : 'stale';
 
@@ -1118,6 +1149,61 @@ async function recordDeployment(
   }
 
   return true;
+}
+
+/** Fields on a source node that only the on-chain stage ever writes. */
+const CARRIED_FIELDS: Record<string, string[]> = {
+  contract: ['wasmPath', 'localWasmHash'],
+  error: ['deployedCheck', 'deployedMismatch'],
+};
+
+/**
+ * Re-attach what only a networked scan can produce, when no networked scan ran.
+ *
+ * `nodes` is rebuilt from source on every scan, so without this an `--offline`
+ * run — which the README installs as a `post-commit` hook — deleted every
+ * deployment and every Wasm hash on every commit, reported each contract as
+ * changed for a change nobody made, and quietly turned `check --fail-on drift`
+ * from a gate that fails into one that passes. A fact that could not be
+ * refreshed is not a fact that disappeared.
+ *
+ * Values are copied verbatim, so a carried node fingerprints identically to the
+ * one it came from and `reconcileWithPrevious` reports nothing about it.
+ */
+function carryOnChain(
+  previous: ProjectMemory | null,
+  nodes: Map<string, MemoryNode>,
+  addEdge: AddEdge,
+): void {
+  if (!previous) return;
+
+  const carried = new Set<string>();
+  for (const old of previous.nodes) {
+    if (old.kind === 'deployment') {
+      if (!nodes.has(old.id)) nodes.set(old.id, old);
+      carried.add(old.id);
+      continue;
+    }
+
+    const current = nodes.get(old.id);
+    if (!current) continue;
+    let kept = false;
+    for (const field of CARRIED_FIELDS[old.kind] ?? []) {
+      const value = old.data?.[field];
+      if (value === undefined) continue;
+      current.data = { ...(current.data ?? {}), [field]: value };
+      kept = true;
+    }
+    // The citation travels with the value: a hash presented without the command
+    // that read it is exactly the kind of unevidenced claim this tool refuses.
+    if (kept) current.provenance.push(...old.provenance.filter((p) => p.source === 'stellar-cli'));
+  }
+
+  for (const edge of previous.edges) {
+    if (!carried.has(edge.from) && !carried.has(edge.to)) continue;
+    if (!nodes.has(edge.from) || !nodes.has(edge.to)) continue;
+    addEdge(edge);
+  }
 }
 
 /**
