@@ -33,6 +33,22 @@ import type { Signal } from '../core/query.js';
  * 2.74:1 on the light surface — which obliges relief: storage nodes are drawn
  * as squares rather than circles, and every element is also listed in a table
  * below the figure. Neither the legend nor the findings rely on hue alone.
+ *
+ * Severity is one hue and one symbol, everywhere.
+ *
+ * There are two severities, so there is one accent: the reserved critical red,
+ * unthemed, the only status step that clears 3:1 against both surfaces (4.68
+ * light, 3.62 dark). The amber this used to put down the side of a finding
+ * measures 1.79:1 on the light surface — a severity cue that exists in dark
+ * mode and not in light — so it is gone. An observation takes no hue at all.
+ *
+ * Red is also the one thing hue cannot be trusted to do here: against the
+ * on-chain orange it measures ΔE 6.8 unsimulated in dark mode and 5.5 under
+ * deuteranopia, so a red ring around an orange diamond is a red ring nobody
+ * sees. Hence a filled triangle — a silhouette no node kind uses — carrying an
+ * exclamation, drawn at the same size in the graph, the legend, the table and
+ * the list. Turn the page greyscale and the warning is still the only triangle
+ * on it.
  * ------------------------------------------------------------------ */
 
 interface Group {
@@ -206,6 +222,53 @@ function layout(nodes: Placed[], edges: MemoryEdge[]): void {
 const esc = (text: string): string =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/* ------------------------------------------------------------------ *
+ * Symbols
+ *
+ * Drawn rather than typed. `⚠` is the obvious alternative and it is a
+ * different glyph on every platform — a flat outline on one, a full-colour
+ * emoji on the next, which on a projector is a yellow smudge at whatever size
+ * the font decided. These are paths: same silhouette on every machine, same
+ * weight beside the text, and they take the colour of the thing they sit in,
+ * so one symbol serves the graph, the legend, the list and the table.
+ *
+ * The exclamation inside the triangle is a hole in the path rather than a mark
+ * on top of it, so the symbol needs to know nothing about what is behind it.
+ * ------------------------------------------------------------------ */
+
+const TRIANGLE =
+  'm14.49 12-5.33-9.33a1.33 1.33 0 0 0-2.32 0l-5.33 9.33A1.33 1.33 0 0 0 2.67 14h10.66a1.33 1.33 0 0 0 1.16-2z' +
+  'M7.25 5.5h1.5v4.4h-1.5z' +
+  'M8 10.95a1.05 1.05 0 1 0 0 2.1 1.05 1.05 0 1 0 0-2.1z';
+
+const icon = (name: string, body: string): string =>
+  `<svg class="ic ic--${name}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${body}</svg>`;
+
+/** Needs attention. */
+const ICON_WARN = icon('warn', `<path fill-rule="evenodd" d="${TRIANGLE}" />`);
+
+/** Worth knowing, nothing to do. */
+const ICON_NOTE = icon(
+  'note',
+  '<circle cx="8" cy="8" r="6.35" fill="none" stroke="currentColor" stroke-width="1.5" />' +
+    '<path d="M8 7.4v4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />' +
+    '<circle cx="8" cy="4.6" r="1" />',
+);
+
+/** Nothing to report — shown only when that is true. */
+const ICON_CLEAR = icon(
+  'clear',
+  '<circle cx="8" cy="8" r="6.35" fill="none" stroke="currentColor" stroke-width="1.5" />' +
+    '<path d="m4.9 8.2 2.2 2.3 4-4.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />',
+);
+
+/** Light or dark, chosen by hand when the room disagrees with the laptop. */
+const ICON_THEME = icon(
+  'theme',
+  '<circle cx="8" cy="8" r="6.35" fill="none" stroke="currentColor" stroke-width="1.5" />' +
+    '<path d="M8 1.65a6.35 6.35 0 0 1 0 12.7z" />',
+);
+
 /**
  * JSON on its way into a `<script>` element.
  *
@@ -345,14 +408,25 @@ export function renderGraphHtml(
             ? `<path d="M ${n2(p.x)} ${n2(p.y - r * 1.25)} L ${n2(p.x + r * 1.25)} ${n2(p.y)} L ${n2(p.x)} ${n2(p.y + r * 1.25)} L ${n2(p.x - r * 1.25)} ${n2(p.y)} Z" />`
             : `<circle cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r)}" />`;
 
-      // A finding needs a mark that survives a small node on a light surface and
-      // a greyscale print. The status yellow alone does not — it sits below 3:1
-      // on light by design — so the ring is thick and dashed, and a glyph sits
-      // beside it. Shape and symbol carry the meaning; colour only reinforces it.
+      // A finding needs a mark that survives a small node in a crowded field, a
+      // bad projector and a greyscale print.
+      //
+      // Three elements, because one is not enough. A gap ring in the surface
+      // colour cuts the node out of whatever it is sitting on, so the mark that
+      // follows never touches the fill and never blends into a neighbour. The
+      // dashed ring is the findable part — dashes, not just red, since the ring
+      // has to read on top of an orange diamond. The triangle is the part that
+      // says what it means, and it is the same triangle as the legend, the list
+      // and the table.
+      //
+      // Sized in the canvas's own units, so it grows with the drawing when the
+      // window scales it up rather than staying a laptop-sized speck.
       const ring =
         p.severity === 'warn'
-          ? `<circle class="ring ring--warn" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r + 5)}" />` +
-            `<text class="flag" x="${n2(p.x + r + 5)}" y="${n2(p.y - r - 3)}">!</text>`
+          ? `<circle class="ring-gap" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r + 5)}" />` +
+            `<circle class="ring ring--warn" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r + 5)}" />` +
+            `<g class="flag" transform="translate(${n2(p.x + r - 4.4)} ${n2(p.y - r - 13.6)}) scale(1.15)">` +
+            `<path fill-rule="evenodd" d="${TRIANGLE}" /></g>`
           : '';
 
       // Contracts and on-chain nodes are few and are the ones a reader is
@@ -370,7 +444,12 @@ export function renderGraphHtml(
         ? `<text class="node-label node-label--${p.group.id}" x="${n2(p.x)}" y="${n2(p.y + r + 15)}">${esc(p.node.title)}</text>`
         : `<text class="node-label node-label--near" text-anchor="${anchor}" x="${n2(p.x)}" y="${n2(p.y + r + 14)}">${esc(p.node.title)}</text>`;
 
-      return `<g class="node node--${p.group.id}" tabindex="0" role="listitem" data-id="${esc(p.node.id)}" aria-label="${esc(p.node.title)}, ${esc(p.node.kind)}">${ring}${shape}${label}<title>${esc(p.node.title)} (${esc(p.node.kind)})</title></g>`;
+      // Marked on the group as well as drawn on it, so the thinning that keeps a
+      // crowded picture readable can leave the marks a reader is hunting for at
+      // full strength. A ring around a node too faint to see is worse than no
+      // ring: it points at nothing.
+      const flagged = p.severity === 'warn' ? ' node--flagged' : '';
+      return `<g class="node node--${p.group.id}${flagged}" tabindex="0" role="listitem" data-id="${esc(p.node.id)}" aria-label="${esc(p.node.title)}, ${esc(p.node.kind)}">${ring}${shape}${label}<title>${esc(p.node.title)} (${esc(p.node.kind)})</title></g>`;
     })
     .join('\n');
 
@@ -406,7 +485,7 @@ export function renderGraphHtml(
     .sort((a, b) => order(a.node.kind, b.node.kind) || order(a.node.title, b.node.title))
     .map(
       (p) =>
-        `<tr><td>${esc(p.node.title)}</td><td>${esc(p.node.kind)}</td><td>${esc(p.node.path ?? '')}</td><td>${p.severity === 'warn' ? '⚠ needs attention' : ''}</td></tr>`,
+        `<tr><td>${esc(p.node.title)}</td><td class="col-kind">${esc(p.node.kind)}</td><td class="col-path">${esc(p.node.path ?? '')}</td><td class="col-state">${p.severity === 'warn' ? `${ICON_WARN}needs attention` : ''}</td></tr>`,
     )
     .join('\n');
 
@@ -422,78 +501,97 @@ export function renderGraphHtml(
     // are three. Numbers only, so there is nothing here to escape.
     trimmed:
       drawn.length < placed.length
-        ? `<p class="trimmed">Drawing ${drawn.length} of ${placed.length} elements. Contracts, on-chain entries, storage keys and anything with a finding come first; the rest are left out to keep the picture legible and the page quick to produce.</p>`
+        ? `<div class="notice">${ICON_NOTE}<p class="trimmed">Drawing ${drawn.length} of ${placed.length} elements. Contracts, on-chain entries, storage keys and anything with a finding come first; the rest are left out to keep the picture legible and the page quick to produce. All ${placed.length} are in the table below.</p></div>`
         : '',
     edgeSvg,
     nodeSvg,
+    // Above 140 marks the picture stops being a diagram and starts being a
+    // texture, and the things worth finding in it have to be given room by
+    // taking weight off everything else.
+    dense: drawn.length > 140,
     rows,
     detail: jsonForScript(Object.fromEntries(detail)),
     generated: memory.scans[memory.scans.length - 1]?.at ?? '',
     live: options.live !== undefined,
     stamp: options.live?.stamp ?? '',
-    findings: options.live ? findingList(memory, signals) : '',
-    // What the heading counts is what the list beneath it contains, warnings
-    // and observations alike. `warnings` above answers a different question —
-    // how many of them need attention — and the header stat is where it is
-    // asked. Two numbers, each true of the set it names.
-    findingCount: options.live ? signals.length : 0,
-    // A finding about the project belongs to no node, so the file page — which
-    // has no findings list — would count it in the header and then show it
-    // nowhere. A number the page cannot substantiate is the failure this tool
-    // exists to prevent, so it gets its own block instead.
-    projectFindings: options.live ? '' : projectFindingBlock(signals),
+    findings: findingsSection(memory, signals),
   });
 }
 
-function projectFindingBlock(signals: Signal[]): string {
-  const wide = signals.filter((s) => s.scope === 'project');
-  if (wide.length === 0) return '';
-  return (
-    `<section class="project-findings"><h2>About the project</h2>` +
-    wide
-      .map(
-        (s) =>
-          `<div class="finding finding--${s.severity}"><span class="tag">${esc(s.category)}</span>${esc(s.message)}</div>`,
-      )
-      .join('') +
-    `</section>`
-  );
-}
-
 /**
- * The findings, on screen before anything is clicked.
+ * The findings, on screen before anything is clicked, in both pages.
  *
- * Served rather than committed, because it is the served page that has to be
- * read at a distance: on the graph a finding is a dashed ring and a `!`, and
- * five of the six in the demo sit on nodes too small to carry a name. The
- * committed file has the table underneath it instead, which a reader can scroll.
+ * This used to be served and not committed, on the reasoning that only the
+ * projected page has to be read at a distance. But the file is the copy that
+ * gets attached to a pull request, and its findings were reachable only by
+ * clicking a mark on the drawing — which meant the most valuable thing the tool
+ * knows was the one thing the artifact would not say out loud, and said nothing
+ * at all with scripting turned off. Every message is already in the file: the
+ * data island beneath the page carries it so the panel can print it. Printing
+ * it here too costs a few hundred bytes and is the difference between a page a
+ * reviewer reads and a page a reviewer clicks around.
+ *
+ * Severity is a heading rather than a shade of a border. A reader who cannot
+ * separate the two hues, or is looking at a washed-out projection of them, still
+ * has two labelled groups in a fixed order, and a different symbol in each.
  */
-function findingList(memory: ProjectMemory, signals: Signal[]): string {
+function findingsSection(memory: ProjectMemory, signals: Signal[]): string {
   const byId = new Map(memory.nodes.map((n) => [n.id, n]));
 
-  return signals
-    .slice()
-    // Stable sort, so within a severity the order is still the order signals()
-    // reported — grouped by the check that produced them.
-    .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'warn' ? -1 : 1))
-    .map((signal) => {
-      // A project-level observation has no single owner. Giving it one lets a
-      // presenter click a contract and read out a claim about three of them.
-      const owner = signal.scope === 'project' ? undefined : signal.nodeId ? byId.get(signal.nodeId) : undefined;
-      const where = owner?.path
-        ? `${owner.path}${owner.line ? `:${owner.line}` : ''}`
-        : signal.scope === 'project'
-          ? 'project-wide'
-          : '';
-      return (
-        `<button type="button" class="finding finding--${signal.severity}"${owner ? ` data-id="${esc(owner.id)}"` : ''}>` +
-        `<span class="tag">${esc(signal.category)}</span>` +
-        `<span class="msg">${esc(signal.message)}</span>` +
-        (where ? `<span class="where">${esc(where)}</span>` : '') +
-        `</button>`
-      );
-    })
-    .join('\n');
+  const row = (signal: Signal): string => {
+    // A project-level observation has no single owner. Giving it one lets a
+    // presenter click a contract and read out a claim about three of them.
+    const owner = signal.scope === 'project' ? undefined : signal.nodeId ? byId.get(signal.nodeId) : undefined;
+    const where = owner?.path
+      ? `${owner.path}${owner.line ? `:${owner.line}` : ''}`
+      : signal.scope === 'project'
+        ? 'project-wide'
+        : '';
+    // Branched, not interpolated. `severity` is a union in the type and a plain
+    // string at runtime, and this one lands inside a class attribute, where a
+    // quote ends the attribute and everything after it is markup — a different
+    // question from escaping text, and one `esc()` is the wrong answer to.
+    // Nothing produces a third severity today; nothing has to, for this to hold.
+    const grade = signal.severity === 'warn' ? 'warn' : 'info';
+    // `data-id` follows the class with nothing between them: that pairing is
+    // what makes a row clickable, and it is asserted as a pair.
+    return (
+      `<li><button type="button" class="finding finding--${grade}"${owner ? ` data-id="${esc(owner.id)}"` : ''}>` +
+      `<span class="sev">${grade === 'warn' ? ICON_WARN : ICON_NOTE}</span>` +
+      `<span class="said">` +
+      `<span class="tag">${esc(signal.category)}</span>` +
+      `<span class="msg">${esc(signal.message)}</span>` +
+      (where ? `<span class="where">${esc(where)}</span>` : '') +
+      `</span></button></li>`
+    );
+  };
+
+  // Two filters rather than a sort: within a group the order is still the order
+  // `signals()` reported, grouped by the check that produced them, and nothing
+  // depends on a comparator being stable.
+  const attention = signals.filter((s) => s.severity === 'warn');
+  const notes = signals.filter((s) => s.severity !== 'warn');
+
+  const group = (label: string, kind: string, held: Signal[]): string =>
+    held.length === 0
+      ? ''
+      : `<h3 class="grade grade--${kind}">${esc(label)}</h3><ul class="finding-list">${held.map(row).join('')}</ul>`;
+
+  const body =
+    signals.length === 0
+      ? `<p class="all-clear">${ICON_CLEAR}Nothing needs attention. Every contract, storage key and deployment below was checked for expiring TTLs, missing authorization and drift from what is deployed.</p>`
+      : group('Needs attention', 'warn', attention) + group('Worth noting', 'note', notes);
+
+  // What the heading counts is what the list beneath it contains, warnings and
+  // observations alike — which is why the number is in plain ink. The red
+  // number in the header answers a different question, how many of them need
+  // attention, and it is the only red number on the page.
+  return (
+    `<section class="findings">` +
+    `<h2>Worth knowing <span class="count">${signals.length}</span></h2>` +
+    body +
+    `</section>`
+  );
 }
 
 interface PageData {
@@ -507,6 +605,8 @@ interface PageData {
   trimmed: string;
   edgeSvg: string;
   nodeSvg: string;
+  /** Enough marks on the canvas that the drawing needs help to stay readable. */
+  dense: boolean;
   rows: string;
   detail: string;
   generated: string;
@@ -514,10 +614,42 @@ interface PageData {
   live: boolean;
   stamp: string;
   findings: string;
-  /** How many rows `findings` holds — not how many of them are warnings. */
-  findingCount: number;
-  projectFindings: string;
 }
+
+/**
+ * The dark column, written once.
+ *
+ * It has to appear under two selectors — the media query for the machine's own
+ * setting, and the attribute for a reader who overrode it — and when those were
+ * two literals in the stylesheet they drifted: the attribute copy was already
+ * missing `--muted`, so choosing dark by hand left one ink at its light value.
+ * One constant, two scopes, nothing to keep in step.
+ *
+ * The steps are chosen for the dark surface rather than flipped from the light
+ * ones. The status red is deliberately not in here: a colour that means "needs
+ * attention" and changes with the theme is not a status colour, and this one
+ * clears 3:1 against both surfaces as it stands.
+ */
+const DARK = `
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface-1: #1a1a19;
+    --sunken: #121211;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #9a988f;
+    --hairline: #2c2c2a;
+    --edge: #4d4d48;
+    --border: rgba(255,255,255,0.14);
+    --lift: none;
+    --contract: #3987e5;
+    --onchain: #d95926;
+    --storage: #199e70;
+    --other: #898781;
+    --attn-text: #e66767;
+    --attn-wash: rgba(208,59,59,0.14);
+    --attn-edge: rgba(208,59,59,0.42);
+    --clear: #0ca30c;`;
 
 const PAGE = (d: PageData): string => `<!doctype html>
 <html lang="en">
@@ -529,46 +661,43 @@ const PAGE = (d: PageData): string => `<!doctype html>
 <style>
   :root {
     color-scheme: light;
+    --plane: #f1f1ee;
     --surface-1: #fcfcfb;
-    --plane: #f9f9f7;
+    --sunken: #f7f7f4;
     --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --muted: #898781;
+    --text-secondary: #4c4b48;
+    --muted: #6f6e69;
     --hairline: #e1e0d9;
-    --border: rgba(11,11,11,0.10);
+    /* The relationship lines, and only those. They carry \`defines\`, \`reads\`
+       and \`tests\` — most of the picture — and at the hairline value they were
+       drawn in they measure about 1.25:1 against the canvas: recessive on a
+       laptop, absent on a projector, and gone entirely in a printed copy. This
+       measures 2.1:1 light and 2.05:1 dark. Recessive is the intent; invisible
+       is not, and it was not only the projected page that suffered from it. */
+    --edge: #b3b1a6;
+    --border: rgba(11,11,11,0.13);
+    --lift: 0 1px 1px rgba(11,11,11,0.04), 0 4px 14px rgba(11,11,11,0.05);
     --contract: #2a78d6;
     --onchain: #eb6834;
     --storage: #1baf7a;
     --other: #898781;
-    --status-warning: #fab219;
-    --status-critical: #d03b3b;
+    /* Reserved, fixed, and the only accent on the page that means anything. */
+    --attn: #d03b3b;
+    /* The same red, stepped for text. The mark step is the reserved status
+       colour and stays put in both modes; against the dark surface it measures
+       3.62:1, which is a mark and is not a label, so red *words* take the
+       palette's dark red step instead and clear 5.39:1. Light needs no second
+       step — the mark colour is already 4.68:1 there. */
+    --attn-text: #d03b3b;
+    --attn-wash: rgba(208,59,59,0.055);
+    --attn-edge: rgba(208,59,59,0.30);
+    --clear: #006300;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface-1: #1a1a19;
-      --plane: #0d0d0d;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --muted: #898781;
-      --hairline: #2c2c2a;
-      --border: rgba(255,255,255,0.10);
-      --contract: #3987e5;
-      --onchain: #d95926;
-      --storage: #199e70;
+    :root:not([data-theme="light"]) {${DARK}
     }
   }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --surface-1: #1a1a19;
-    --plane: #0d0d0d;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --hairline: #2c2c2a;
-    --border: rgba(255,255,255,0.10);
-    --contract: #3987e5;
-    --onchain: #d95926;
-    --storage: #199e70;
+  :root[data-theme="dark"] {${DARK}
   }
 
   * { box-sizing: border-box; }
@@ -577,36 +706,83 @@ const PAGE = (d: PageData): string => `<!doctype html>
     background: var(--plane);
     color: var(--text-primary);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
   }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 20px 64px; }
-  header { margin-bottom: 22px; }
-  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .purpose { color: var(--text-secondary); margin: 0 0 16px; max-width: 70ch; }
-  .stats { display: flex; flex-wrap: wrap; gap: 26px; margin-bottom: 4px; }
-  .stat b { display: block; font-size: 22px; line-height: 1.2; }
-  .stat span { color: var(--muted); font-size: 13px; }
-  .stat--warn b { color: var(--status-critical); }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 30px 22px 60px; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0 10px; font-size: 13px; color: var(--text-secondary); }
+  /* Every symbol on the page is one of four paths at one of three sizes, and
+     takes the colour of whatever it sits in. */
+  .ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -2px; fill: currentColor; }
+
+  /* ---- who this is, and the one number that is not inventory ---------- */
+
+  header { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 24px; align-items: start; margin-bottom: 20px; }
+  .ident { grid-column: 1; grid-row: 1; min-width: 0; }
+  h1 { font-size: 27px; font-weight: 650; margin: 0; letter-spacing: -0.02em; }
+  .purpose { color: var(--text-secondary); margin: 6px 0 0; max-width: 80ch; font-size: 14.5px; }
+
+  /* Three counts describe the picture and one describes the state of the
+     project. Keeping them the same size was the old page's way of saying they
+     were equally interesting, which they are not: the fourth is the reason
+     anybody opened the file. It gets the size, the accent and the symbol; the
+     other three stay quiet enough to read as context. */
+  .stats { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 22px; margin-top: 16px; }
+  .stat b { display: block; font-size: 19px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .stat span { display: block; color: var(--text-secondary); font-size: 12.5px; }
+  .stat--warn { padding-left: 22px; border-left: 1px solid var(--border); }
+  .stat--warn b { color: var(--attn-text); font-size: 27px; }
+  .stat--warn span { display: flex; align-items: center; gap: 5px; font-weight: 600; color: var(--text-primary); }
+  .stat--warn .ic { color: var(--attn); width: 14px; height: 14px; }
+  /* Nothing to report is not an alarm. The accent is reserved for a number
+     somebody has to do something about, and zero is not one. */
+  .stat--none b, .stat--none .ic { color: var(--clear); }
+
+  .theme {
+    grid-column: 2; grid-row: 1; justify-self: end;
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font: inherit; font-size: 12.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px;
+  }
+  .theme:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .theme .ic { width: 14px; height: 14px; }
+
+  .no-js { margin: 0 0 16px; font-size: 13.5px; color: var(--text-secondary); }
+
+  /* ---- the figure ------------------------------------------------------ */
+
+  .board { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .board { grid-template-columns: 1fr; } }
+  .figure { min-width: 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 0 0 11px; font-size: 13px; color: var(--text-secondary); }
   .legend-item { display: flex; align-items: center; gap: 7px; }
-  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .swatch { width: 13px; height: 13px; border-radius: 50%; flex: none; }
   .swatch--square { border-radius: 2px; }
   .swatch--diamond { border-radius: 2px; transform: rotate(45deg); }
-  .swatch--ring { background: none; border: 2px dashed var(--status-critical); }
-  .trimmed { margin: 0 0 12px; color: var(--text-secondary); font-size: 13px; max-width: 90ch; }
+  .legend .ic { width: 15px; height: 15px; color: var(--attn); }
 
-  .board { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 18px; align-items: start; }
-  @media (max-width: 940px) { .board { grid-template-columns: 1fr; } }
+  /* The drawing admitting what it left out. Neutral rather than red: it is not
+     a finding, and a page that shouts twice is a page nobody believes twice. */
+  .notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin: 0 0 12px; padding: 10px 13px;
+    background: var(--sunken); border: 1px solid var(--border);
+    border-left: 3px solid var(--text-secondary); border-radius: 7px;
+  }
+  .notice .ic { color: var(--text-secondary); margin-top: 2px; }
+  .trimmed { margin: 0; color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; max-width: 96ch; }
 
   .canvas {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow-x: auto;
+    box-shadow: var(--lift);
   }
-  svg { display: block; width: 100%; height: auto; }
+  .canvas > svg { display: block; width: 100%; height: auto; }
 
-  .edge { stroke: var(--hairline); stroke-width: 1.25; }
+  .edge { stroke: var(--edge); stroke-width: 1.25; }
   .edge--calls { stroke: var(--contract); stroke-width: 2; stroke-opacity: 0.55; }
   .edge--deployed_as { stroke: var(--onchain); stroke-width: 2; stroke-dasharray: 4 3; }
   .edge--writes { stroke: var(--storage); stroke-width: 1.75; }
@@ -622,20 +798,23 @@ const PAGE = (d: PageData): string => `<!doctype html>
   .node:focus { outline: none; }
   .node.is-selected > rect, .node.is-selected > circle, .node.is-selected > path { stroke: var(--text-primary); stroke-width: 3; }
 
-  .ring { fill: none; stroke-width: 3; stroke-dasharray: 3 2.5; }
-  .ring--warn { stroke: var(--status-critical); }
+  /* Selected by element AND class, deliberately.
+     \`.ring\` alone loses to \`.node--other > circle\` — one class against one class
+     and a type — so for two of the four groups the finding ring was being filled
+     with the group's own colour and stroked in the surface colour, and for the
+     other two it was a surface-coloured circle on a surface-coloured canvas:
+     invisible. The legend promised a red dashed ring the drawing never drew. */
+  .node > circle.ring-gap { fill: none; stroke: var(--surface-1); stroke-width: 5; }
+  .node > circle.ring { fill: none; stroke: var(--attn); stroke-width: 2.5; stroke-dasharray: 3.5 2.75; }
 
-  .flag {
-    font: 700 13px system-ui, sans-serif;
-    fill: var(--status-critical);
-    paint-order: stroke;
-    stroke: var(--surface-1);
-    stroke-width: 3;
-    pointer-events: none;
-  }
+  /* paint-order puts the surface stroke behind the fill, which both lifts the
+     triangle off whatever it overlaps and fills the exclamation — a hole in the
+     path rather than a mark on top of it — with the canvas colour. */
+  .flag { pointer-events: none; }
+  .flag > path { fill: var(--attn); paint-order: stroke; stroke: var(--surface-1); stroke-width: 2.2; stroke-linejoin: round; }
 
   .node-label {
-    font: 600 12px system-ui, sans-serif;
+    font: 600 12px system-ui, -apple-system, "Segoe UI", sans-serif;
     fill: var(--text-primary);
     text-anchor: middle;
     paint-order: stroke;
@@ -644,6 +823,19 @@ const PAGE = (d: PageData): string => `<!doctype html>
     pointer-events: none;
   }
   .node-label--onchain { font-weight: 500; font-size: 11px; fill: var(--text-secondary); }
+
+  /* Past a certain count the drawing is a texture, and everything in it is
+     equally loud. Nothing is hidden — the structure a reader came for is the
+     contracts, what is deployed and what is stored, so the functions, events and
+     tests that make up the bulk step back and let it through. The marks that
+     carry a finding keep their full weight, which is the point of thinning the
+     rest. */
+  .is-dense .edge { stroke-width: 1; stroke-opacity: 0.55; }
+  .is-dense .edge--calls { stroke-width: 1.5; stroke-opacity: 0.45; }
+  .is-dense .node--other > circle { opacity: 0.45; }
+  .is-dense .node--storage > rect { opacity: 0.8; }
+  .is-dense .node.is-near > circle, .is-dense .node.is-near > rect { opacity: 1; }
+  .is-dense .node--flagged > circle, .is-dense .node--flagged > rect, .is-dense .node--flagged > path { opacity: 1; }
 
   /* Selecting a node dims everything that is not next to it, rather than hiding
      it: the reader keeps the sense of how big the rest of the system is, and the
@@ -657,67 +849,150 @@ const PAGE = (d: PageData): string => `<!doctype html>
   }
   .node.is-near > .node-label--near { display: block; }
 
-  .panel {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 18px;
-    position: sticky;
-    top: 18px;
-  }
-  .panel h2 { font-size: 15px; margin: 0 0 2px; }
-  .panel .kind { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .panel .path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; margin: 8px 0; }
-  .panel p { color: var(--text-secondary); font-size: 13px; }
-  .finding { border-left: 3px solid var(--status-warning); padding: 6px 0 6px 10px; margin: 10px 0; font-size: 13px; }
-  .finding--info { border-left-color: var(--muted); }
-  .finding .tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-right: 6px; }
-  .project-findings { margin-bottom: 18px; }
-  .project-findings .finding { margin-top: 0; }
-  .rel { font-size: 13px; display: flex; gap: 8px; padding: 2px 0; }
-  .rel code { font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); min-width: 84px; }
+  .side { min-width: 0; position: sticky; top: 18px; display: flex; flex-direction: column; gap: 14px; }
 
-  details { margin-top: 24px; }
-  summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; }
-  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--hairline); }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-  footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+  /* ---- what the page is for -------------------------------------------- */
+
+  .findings { min-width: 0; }
+  .findings h2 { display: flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; }
+  /* Plain ink: it counts the findings, not the warnings. The red number lives
+     in the header and answers the other question. */
+  .findings .count {
+    font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--text-secondary); background: var(--hairline);
+    border-radius: 999px; padding: 1px 9px;
+  }
+
+  /* Severity, said in words and in a fixed order, before any colour is
+     involved. A heading survives a projector, a greyscale print and a reader
+     who cannot separate red from grey. */
+  .grade {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-secondary); margin: 16px 0 8px;
+  }
+  .grade::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+  .grade--warn { color: var(--attn-text); }
+
+  .finding-list { list-style: none; margin: 0; padding: 0; }
+  .finding-list li + li { margin-top: 7px; }
+
+  .finding {
+    display: flex; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+    font: inherit; color: var(--text-primary);
+    background: var(--surface-1);
+    border: 1px solid var(--border); border-left: 3px solid var(--muted);
+    border-radius: 7px; padding: 10px 11px;
+  }
+  /* Fill, rule weight and rule pattern all move with severity, so the two
+     states are still two states in greyscale. */
+  .finding--warn { background: var(--attn-wash); border-color: var(--attn-edge); border-left-color: var(--attn); }
+  .finding--info { border-left-style: dotted; }
+  .finding .sev { flex: none; line-height: 0; }
+  .finding .sev .ic { width: 17px; height: 17px; margin-top: 2px; }
+  .finding--warn .sev { color: var(--attn); }
+  .finding--info .sev { color: var(--muted); }
+  .finding .said { min-width: 0; }
+  .finding .tag { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-secondary); }
+  .finding .msg { display: block; font-size: 14px; line-height: 1.42; margin-top: 2px; }
+  .finding--warn .msg { font-weight: 500; }
+  .finding .where { display: block; margin-top: 6px; font: 11.5px/1.35 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); word-break: break-all; }
+  .finding:hover { border-color: var(--text-secondary); }
+  .finding:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+  .finding.is-active { border-color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--text-primary); }
+
+  /* Shown only when it is true, and it says what was checked — "no findings"
+     and "nothing was looked for" are not the same sentence. */
+  .all-clear {
+    display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0;
+    font-size: 13.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-left: 3px solid var(--clear); border-radius: 7px; padding: 11px 12px;
+  }
+  .all-clear .ic { color: var(--clear); width: 17px; height: 17px; margin-top: 1px; }
+
+  /* ---- the element under the cursor ------------------------------------ */
+
+  .detail {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; box-shadow: var(--lift);
+  }
+  .detail h2 { font-size: 15.5px; margin: 0 0 2px; }
+  .detail .kind { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .detail .path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; margin: 8px 0; }
+  .detail p { color: var(--text-secondary); font-size: 13.5px; margin: 6px 0; }
+  .detail .finding { cursor: default; margin: 8px 0 0; }
+  .rel { font-size: 13px; display: flex; gap: 9px; padding: 3px 0; }
+  .rel code { font: 11.5px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); min-width: 86px; }
+
+  /* ---- everything, for the reader who wants everything ------------------ */
+
+  details { margin-top: 26px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: 600; padding: 6px 0; }
+  summary:hover { color: var(--text-primary); }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--hairline); }
+  th { color: var(--text-secondary); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; }
+  .col-kind { color: var(--text-secondary); }
+  .col-path { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--text-secondary); word-break: break-all; }
+  .col-state { color: var(--attn-text); font-weight: 600; white-space: nowrap; }
+  .col-state .ic { width: 14px; height: 14px; margin-right: 5px; }
+  footer { margin-top: 30px; color: var(--muted); font-size: 12px; }
+
+  /* A page that gets attached to a pull request gets printed as often as it
+     gets opened. Cards keep their edges, the accent survives greyscale as a
+     rule and a triangle, and nothing breaks across a page mid-finding. */
+  @media print {
+    :root { --plane: #fff; --surface-1: #fff; --sunken: #fff; --border: rgba(0,0,0,0.3); --lift: none; }
+    body { background: #fff; }
+    .theme, .no-js { display: none; }
+    .board { display: block; }
+    .side { position: static; margin-top: 20px; }
+    .finding, .notice, .all-clear, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 ${d.live ? LIVE_STYLE : ''}</style>
 </head>
 <body${d.live ? ` class="live" data-warnings="${d.warnings}"` : ''}>
 <div class="wrap">
   <header>
-    <h1>${d.project}</h1>
-    ${d.purpose ? `<p class="purpose">${d.purpose}</p>` : ''}
+    <div class="ident">
+      <h1>${d.project}</h1>
+      ${d.purpose ? `<p class="purpose">${d.purpose}</p>` : ''}
+    </div>
+    <button type="button" class="theme" aria-label="Switch between the light and dark palette">${ICON_THEME}<span class="theme-label">Theme</span></button>
     <div class="stats">
       <div class="stat"><b>${d.contracts}</b><span>contracts</span></div>
       <div class="stat"><b>${d.nodes}</b><span>elements</span></div>
       <div class="stat"><b>${d.edges}</b><span>relationships</span></div>
-      <div class="stat stat--warn"><b>${d.warnings}</b><span>need attention</span></div>
+      <div class="stat${d.warnings === 0 ? ' stat--none' : ''} stat--warn"><b>${d.warnings}</b><span>${d.warnings === 0 ? ICON_CLEAR : ICON_WARN}need attention</span></div>
     </div>
   </header>
 
-  <div class="legend" role="list">
-    <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--contract)"></span> Contract</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--diamond" style="background: var(--onchain)"></span> On-chain</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--square" style="background: var(--storage)"></span> Storage key</span>
-    <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--other)"></span> Function, event, error, test</span>
-    <span class="legend-item" role="listitem"><span class="swatch swatch--ring"></span> ⚠ Has a finding</span>
-  </div>
-${d.trimmed}
+  <noscript><p class="no-js">Scripting is off, so the drawing will not respond to a click. Everything it would have told you is already written out: the findings beside it, and every element in the table below.</p></noscript>
+
   <div class="board">
-    <div class="canvas">
-      <svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="list" aria-label="Project graph">
-        <g class="edges">${d.edgeSvg}</g>
-        <g class="nodes">${d.nodeSvg}</g>
-      </svg>
+    <div class="figure">
+      <div class="legend" role="list">
+        <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--contract)"></span> Contract</span>
+        <span class="legend-item" role="listitem"><span class="swatch swatch--diamond" style="background: var(--onchain)"></span> On-chain</span>
+        <span class="legend-item" role="listitem"><span class="swatch swatch--square" style="background: var(--storage)"></span> Storage key</span>
+        <span class="legend-item" role="listitem"><span class="swatch" style="background: var(--other)"></span> Function, event, error, test</span>
+        <span class="legend-item" role="listitem">${ICON_WARN} Needs attention</span>
+      </div>
+${d.trimmed}
+      <div class="canvas">
+        <svg class="graph${d.dense ? ' is-dense' : ''}" viewBox="0 0 ${WIDTH} ${HEIGHT}" role="list" aria-label="Project graph">
+          <g class="edges">${d.edgeSvg}</g>
+          <g class="nodes">${d.nodeSvg}</g>
+        </svg>
+      </div>
     </div>
-    <aside class="panel">
-      ${d.live ? `<section class="findings"><h2>Worth knowing <span class="count">${d.findingCount}</span></h2>${d.findings}</section>` : d.projectFindings}
-      <div id="panel">
+    <aside class="side">
+      ${d.findings}
+      <div id="panel" class="detail">
         <h2>Select an element</h2>
-        <p>Click any node to see what it is, where it lives, and what it connects to. Everything here came from the source and from read-only queries to the network.</p>
+        <p>Click any node — or any finding — to see what it is, where it lives, and what it connects to. Everything here came from the source and from read-only queries to the network.</p>
       </div>
     </aside>
   </div>
@@ -735,6 +1010,8 @@ ${d.trimmed}
 
 <script>
 const DETAIL = ${d.detail};
+const WARN_ICON = '${ICON_WARN}';
+const NOTE_ICON = '${ICON_NOTE}';
 const panel = document.getElementById('panel');
 const svg = document.querySelector('svg');
 const EDGES = Array.from(svg.querySelectorAll('.edge'));
@@ -787,8 +1064,14 @@ function show(id) {
   // rather than something this process produced. Kind, category and relation are
   // unions in the type and plain strings on disk, so they are escaped like the
   // free text beside them.
+  // The severity class is branched rather than interpolated: it is a union in
+  // the type and a plain string on disk, and this one ends up inside a class
+  // attribute, where escaping is not the same question as escaping text.
   const findings = d.findings.map(f =>
-    '<div class="finding"><span class="tag">' + escapeHtml(f.category) + '</span>' + escapeHtml(f.message) + '</div>'
+    '<div class="finding finding--' + (f.severity === 'warn' ? 'warn' : 'info') + '">' +
+    '<span class="sev">' + (f.severity === 'warn' ? WARN_ICON : NOTE_ICON) + '</span>' +
+    '<span class="said"><span class="tag">' + escapeHtml(f.category) + '</span>' +
+    '<span class="msg">' + escapeHtml(f.message) + '</span></span></div>'
   ).join('');
   const links = d.links.map(l =>
     '<div class="rel"><code>' + (l.direction === 'out' ? '→ ' : '← ') + escapeHtml(l.kind) + '</code><span>' + escapeHtml(l.other) + '</span></div>'
@@ -815,7 +1098,11 @@ for (const node of NODES.values()) {
   });
 }
 
-for (const row of document.querySelectorAll('.finding[data-id]')) {
+// Every row, not only the ones that own a node: a finding about the project as
+// a whole has nothing to select, and clicking it puts the whole graph back,
+// which is exactly what it is a finding about. A row that did nothing at all
+// would be a button that lies.
+for (const row of document.querySelectorAll('.finding')) {
   // Marked after show(), which clears whichever row was marked before it.
   row.addEventListener('click', () => {
     show(row.dataset.id);
@@ -826,6 +1113,35 @@ for (const row of document.querySelectorAll('.finding[data-id]')) {
 // Clicking away from a node, or Escape, puts the whole graph back.
 svg.addEventListener('click', (e) => { if (!e.target.closest('.node')) focusOn(null); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') focusOn(null); });
+
+/**
+ * Light or dark, when the room disagrees with the laptop.
+ *
+ * The palette already follows the machine's own setting, which is right nearly
+ * everywhere and wrong in the one room this page was built for: a projector
+ * that washes out a dark page, or a lit hall that glares off a light one, with
+ * the laptop's preference set weeks ago. The stylesheet was already written to
+ * be overridden in both directions, so this is a stamp on the root element.
+ *
+ * Everything here is guarded. The page's script is also run headless against a
+ * minimal DOM, and a redesign that threw on a missing element there would take
+ * the click handling above with it.
+ */
+(function () {
+  const root = document.documentElement;
+  const button = document.querySelector('.theme');
+  if (!root || !root.dataset || !button) return;
+  const label = button.querySelector ? button.querySelector('.theme-label') : null;
+  const wantsDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+  let dark = root.dataset.theme ? root.dataset.theme === 'dark' : wantsDark;
+  const paint = () => { if (label) label.textContent = dark ? 'Light' : 'Dark'; };
+  paint();
+  button.addEventListener('click', () => {
+    dark = !dark;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    paint();
+  });
+})();
 ${d.live ? LIVE_SCRIPT.replace('__STAMP__', () => d.stamp) : ''}
 </script>
 </body>
@@ -858,50 +1174,47 @@ const LIVE_STYLE = `
     max-width: none;
     height: 100vh;
     height: 100dvh;
-    padding: 16px 24px 14px;
+    padding: 14px 22px 12px;
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-  body.live header, body.live .legend, body.live .trimmed { flex: none; margin: 0; }
-  body.live header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; }
-  body.live h1 { font-size: 20px; margin: 0; }
-  body.live .stats { margin: 0; gap: 22px; }
-  body.live .stat b { font-size: 18px; transform-origin: left center; }
-  body.live .purpose { order: 1; flex-basis: 100%; margin: 0; font-size: 13px; max-width: none;
+
+  /* One band across the top instead of two: the window has a fixed height and
+     every row spent on the header is a row taken off the drawing. */
+  body.live header { display: flex; flex-wrap: nowrap; align-items: center; gap: 22px; margin: 0; flex: none; }
+  body.live .ident { display: flex; align-items: baseline; gap: 14px; flex: 1 1 auto; min-width: 0; order: 1; }
+  body.live h1 { font-size: 21px; flex: none; white-space: nowrap; }
+  body.live .purpose { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 13px; max-width: none;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.live .board { flex: 1; min-height: 0; align-items: stretch; grid-template-columns: minmax(0,1fr) 340px; }
-  body.live .canvas { display: grid; overflow: hidden; }
+  body.live .stats { margin: 0; gap: 4px 20px; flex: none; align-items: center; order: 2; }
+  body.live .stat b { font-size: 19px; transform-origin: left center; }
+  body.live .stat--warn b { font-size: 30px; }
+  body.live .stat--warn { padding-left: 20px; }
+  body.live .theme { order: 3; flex: none; }
+
+  body.live .board { flex: 1; min-height: 0; align-items: stretch; gap: 18px;
+    grid-template-columns: minmax(0,1fr) 400px; }
+  body.live .figure { display: flex; flex-direction: column; min-height: 0; }
+  body.live .legend, body.live .notice { flex: none; }
+  body.live .canvas { flex: 1; min-height: 0; display: grid; overflow: hidden; }
   body.live .canvas > svg { width: 100%; height: 100%; }
-  body.live .panel { position: static; max-height: 100%; overflow-y: auto; }
+  body.live .side { position: static; min-height: 0; overflow-y: auto; }
   body.live details, body.live footer { display: none; }
-  @media (max-width: 940px) { body.live .panel { max-height: 38vh; } }
+  @media (max-width: 980px) { body.live .side { max-height: 38vh; } }
 
-  /* The hairlines carry \`defines\`, \`reads\` and \`tests\` — most of the
-     relationships in the picture — at about 1.25:1 against the canvas, which is
-     legible on a laptop and simply gone on a projector. Both values below
-     measure 2.1:1 and 2.05:1 against their surface. Recessive is the intent;
-     invisible is not. */
-  body.live { --hairline: #b3b1a6; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.live { --hairline: #4d4d48; } }
-  :root[data-theme="dark"] body.live { --hairline: #4d4d48; }
-
-  .findings { margin-bottom: 18px; }
-  .findings h2 { display: flex; align-items: baseline; gap: 8px; font-size: 15px; margin: 0 0 10px; }
-  .findings .count { color: var(--status-critical); font-size: 20px; font-weight: 700; }
-  .findings .finding {
-    display: block; width: 100%; text-align: left; cursor: pointer;
-    background: none; border: 0; border-left: 3px solid var(--status-warning);
-    padding: 6px 8px 6px 10px; margin: 0 0 8px; font: inherit; font-size: 13px;
-    color: var(--text-primary); border-radius: 0 4px 4px 0;
-  }
-  .findings .finding--info { border-left-color: var(--muted); }
-  .findings .finding:hover, .findings .finding:focus-visible, .findings .finding.is-active {
-    background: var(--border); outline: none;
-  }
-  .findings .tag { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
-  .findings .msg { display: block; }
-  .findings .where { display: block; margin-top: 3px; font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
+  /* Read from the back of a room rather than from a chair. The drawing scales
+     with the window on its own — it is one viewBox — so what is left is the
+     text beside it, and the finding is the text that has to arrive. */
+  body.live .findings h2 { font-size: 19px; }
+  body.live .findings .count { font-size: 13.5px; }
+  body.live .grade { font-size: 12px; margin: 12px 0 7px; }
+  body.live .finding { padding: 9px 11px; gap: 9px; }
+  body.live .finding-list li + li { margin-top: 6px; }
+  body.live .finding .tag { font-size: 11px; }
+  body.live .finding .msg { font-size: 15px; line-height: 1.36; }
+  body.live .finding .where { font-size: 12px; margin-top: 4px; }
+  body.live .all-clear { font-size: 15px; }
 
   /* A count that changed is the news. The delta says what it can prove — the
      previous number — and not which finding moved, because two resolved and one
@@ -916,11 +1229,11 @@ const LIVE_STYLE = `
     background: var(--surface-1); border: 1px solid var(--border);
     color: var(--text-secondary); pointer-events: none;
   }
-  /* Clear of the panel while there is one beside the canvas: 340px of panel,
-     18px of gap and 24px of page padding. It passes no clicks through, but it
-     was sitting on the panel's scrollbar and its last finding, and the states
+  /* Clear of the column while there is one beside the canvas: 400px of findings,
+     18px of gap and 22px of page padding. It passes no clicks through, but it
+     was sitting on the column's scrollbar and its last finding, and the states
      worth reading — a failed rescan, a stopped server — are the longest. */
-  @media (min-width: 941px) { body.live .pill { right: 396px; } }
+  @media (min-width: 981px) { body.live .pill { right: 454px; } }
   @media (prefers-reduced-motion: reduce) { .stat--warn.is-changed b { animation: none } }
 `;
 
