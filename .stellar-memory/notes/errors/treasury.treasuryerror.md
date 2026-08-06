@@ -4,8 +4,8 @@ kind: error
 title: TreasuryError
 path: demo/private-payroll/contracts/treasury/src/lib.rs
 summary: Contract error enum with 3 variants. The discriminants are published ABI.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T22:23:18.191Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/error

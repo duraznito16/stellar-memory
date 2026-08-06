@@ -3,19 +3,43 @@ id: deployment:testnet.CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU
 kind: deployment
 title: payroll @ testnet
 summary: Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/deployment
-stale: true
-stale_since: 2026-08-06
 ---
 
 <!-- stellar-memory:auto -->
-> [!warning] No longer present
-> This was last seen in the project on 2026-08-06T18:12:12.243Z.
-> The scan on 2026-08-06 did not find it. Your own notes below are preserved.
+# payroll @ testnet
+
+Live at `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`.
+
+## On-chain
+
+- **Network:** `testnet`
+- **Contract ID:** `CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU`
+- **Alias:** `payroll`
+- **Deployed Wasm hash:** `827959b533719d77c85ce78d4292459a4a1009bc6838125006c370ff0dd5b63c`
+- **Drift:** not checked — the deployed Wasm was never compared with a local build, so whether they agree is unknown.
+
+### Build metadata
+
+- `rsver`: 1.97.1
+- `rssdkver`: 22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02
+
+## Connections
+
+**Source contract**
+- [[contracts/payroll|Payroll]]
+
+---
+
+<details><summary>Where this came from</summary>
+
+- Reported by `stellar contract fetch --id CDVMJUZ4YZIG6JME7LGVEW6MPNTV5DKR6VCAZLNRADINPLDVHLB4Z7XU` on `testnet` (ground truth)
+
+</details>
 <!-- /stellar-memory:auto -->
 
 ## Notes

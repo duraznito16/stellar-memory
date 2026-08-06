@@ -4,8 +4,8 @@ kind: crate
 title: employee-registry
 path: demo/private-payroll/contracts/employee-registry/Cargo.toml
 summary: Maps employee addresses to salary bands.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/crate

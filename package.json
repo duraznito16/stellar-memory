@@ -1,6 +1,6 @@
 {
   "name": "soroban-memory",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Persistent memory layer for Stellar/Soroban projects. Scans your repo, links code to on-chain reality, and serves the result to you and to your AI agents over MCP.",
   "type": "module",
   "license": "Apache-2.0",

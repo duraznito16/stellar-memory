@@ -4,8 +4,8 @@ kind: doc
 title: stellar-archivist.md
 path: templates/agents/stellar-archivist.md
 summary: "--- name: stellar-archivist description: Use after a decision is made, a bug is understood, an approach is rejected, or a session ends with something learned. Writes that reasoning into the project's memory notes so it survives. Use it when you catch yourself thinking \"we should write this down\"."
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/doc

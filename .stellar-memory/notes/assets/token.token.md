@@ -4,8 +4,8 @@ kind: asset
 title: Token (token)
 path: demo/private-payroll/contracts/treasury/src/lib.rs
 summary: Token contract this project moves value through.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/asset

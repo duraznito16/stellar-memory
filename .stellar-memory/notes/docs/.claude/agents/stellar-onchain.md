@@ -4,8 +4,8 @@ kind: doc
 title: stellar-onchain.md
 path: .claude/agents/stellar-onchain.md
 summary: "--- name: stellar-onchain description: Use for anything touching the stellar CLI bridge or on-chain data — contract interfaces, Wasm hashes, metadata, aliases, networks, drift detection. Owns src/stellar/cli.ts and src/stellar/spec.ts. Use it before assuming any stellar CLI flag or output shape."
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/doc

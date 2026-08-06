@@ -294,6 +294,8 @@ test('a severity cannot break out of the class attribute it is written into', ()
  * ------------------------------------------------------------------ */
 
 interface Fake {
+  /** Element name, so a tag selector can be resolved the way a browser resolves it. */
+  tag: string;
   dataset: Record<string, string>;
   classList: { add(c: string): void; remove(c: string): void; contains(c: string): boolean };
   addEventListener(type: string, fn: (event: unknown) => void): void;
@@ -309,6 +311,13 @@ interface Fake {
 
 /** `.node`, `.finding[data-id]`, `.node[data-id="x"]` — all the page ever asks for. */
 function matches(el: Fake, selector: string): boolean {
+  // A leading tag name counts. Without it this harness answered `svg` with
+  // whatever the page wanted rather than with the first svg in the document,
+  // which is how a bare `querySelector('svg')` passed every test here while
+  // returning a 16px legend icon in a real browser.
+  const tag = /^[a-z]+/.exec(selector)?.[0];
+  if (tag && el.tag !== tag) return false;
+
   const parts = selector.match(/\.[\w-]+|\[[^\]]+\]/g) ?? [];
   return parts.every((part) => {
     if (part.startsWith('.')) return el.classList.contains(part.slice(1));
@@ -320,10 +329,11 @@ function matches(el: Fake, selector: string): boolean {
   });
 }
 
-function element(classes: string, dataset: Record<string, string> = {}): Fake {
+function element(classes: string, dataset: Record<string, string> = {}, tag = 'div'): Fake {
   const held = new Set(classes.split(' ').filter(Boolean));
   const handlers = new Map<string, ((event: unknown) => void)[]>();
   const el: Fake = {
+    tag,
     dataset,
     classList: { add: (c) => void held.add(c), remove: (c) => void held.delete(c), contains: (c) => held.has(c) },
     addEventListener: (type, fn) => void handlers.set(type, [...(handlers.get(type) ?? []), fn]),
@@ -364,19 +374,24 @@ function open(html: string): {
     element(m[1]!, { id: m[2]! }),
   );
 
-  const svg = element('graph');
+  // The legend glyphs and the theme toggle are inline <svg> as well, and they
+  // are drawn before the graph. Their presence is the whole reason the page has
+  // to ask for `svg.graph`: a browser answers `svg` with the first one, which is
+  // a 16px icon containing no nodes and raising no error.
+  const icons = [...html.matchAll(/<svg class="(ic[^"]*)"/g)].map((m) => element(m[1]!, {}, 'svg'));
+  const svg = element('graph', {}, 'svg');
   const panel = element('panel');
   const body = element('live', { warnings: html.match(/data-warnings="(\d+)"/)?.[1] ?? '0' });
   const inSvg = [...nodes, ...edges];
-  const everything = [...inSvg, ...findings, panel, body];
+  // Document order, because `querySelector` returns the first match in it.
+  const everything = [...icons, svg, ...inSvg, ...findings, panel, body];
   const keys: ((event: unknown) => void)[] = [];
 
   const document = {
     title: 'fixture',
     body,
     getElementById: (id: string) => (id === 'panel' ? panel : null),
-    // The only tag selector the page uses.
-    querySelector: (s: string) => (s === 'svg' ? svg : everything.find((el) => matches(el, s)) ?? null),
+    querySelector: (s: string) => everything.find((el) => matches(el, s)) ?? null,
     querySelectorAll: (s: string) => everything.filter((el) => matches(el, s)),
     createElement: () => element(''),
     addEventListener: (_type: string, fn: (event: unknown) => void) => void keys.push(fn),
@@ -414,6 +429,35 @@ function open(html: string): {
     },
   };
 }
+
+test('the page finds its graph even though icons are drawn before it', () => {
+  // Shipped broken in 0.2.5. The script opened with `querySelector('svg')`,
+  // which was written when the graph was the only svg on the page. Once the
+  // legend and the findings list gained inline glyphs, that returned a 16px
+  // icon — and `querySelectorAll('.node')` on an icon is empty rather than an
+  // error, so every click handler was attached to nothing. The page rendered,
+  // hovered and looked finished; only clicking did nothing at all.
+  const html = renderGraphHtml(fixture(), [], { live: { stamp: 'x' } });
+
+  const firstSvg = html.slice(html.indexOf('<svg'), html.indexOf('<svg') + 40);
+  assert.ok(
+    !firstSvg.includes('class="graph'),
+    'this test is only worth running while some icon is still drawn first',
+  );
+  // The assignment, not any occurrence: the comment above it names the wrong
+  // selector on purpose, and prose should not be able to fail a test about code.
+  assert.match(
+    island(html),
+    /const svg = document\.querySelector\('svg\.graph'\)/,
+    'the graph must be asked for by class; a bare tag selector reaches an icon',
+  );
+
+  // And the behaviour that depends on it, not just the spelling.
+  const page = open(html);
+  const before = page.panel.innerHTML;
+  page.node('storage:Payroll.Admin').fire('click');
+  assert.notEqual(page.panel.innerHTML, before, 'clicking a node must fill the panel');
+});
 
 test('Escape leaves nothing behind claiming to be selected', () => {
   const page = open(renderGraphHtml(fixture(), [], { live: { stamp: 'x' } }));

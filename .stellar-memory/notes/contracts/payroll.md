@@ -4,8 +4,8 @@ kind: contract
 title: Payroll
 path: demo/private-payroll/contracts/payroll/src/lib.rs
 summary: Soroban contract with 4 public functions.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/contract
@@ -31,6 +31,9 @@ Soroban contract with 4 public functions.
 - [[contracts/employeeregistry|EmployeeRegistry]] — via `registry::Client` in `pay`
 - [[contracts/treasury|Treasury]] — via `treasury::Client` in `pay`
 
+**Deployed as**
+- [[deployments/testnet.cdvmjuz4yzig6jme7lgvew6mpntv5dkr6vcazlnradinpldvhlb4z7xu|payroll @ testnet]]
+
 **Defined in**
 - [[crates/payroll|payroll]]
 - [[semillero|Semillero]]
@@ -41,6 +44,7 @@ Soroban contract with 4 public functions.
 **Documented in**
 - [[docs/.claude/agents/memory-vault|memory-vault.md]]
 - [[docs/.claude/agents/release-verify|release-verify.md]]
+- [[docs/.claude/agents/stellar-scout|stellar-scout.md]]
 - [[docs/demo/private-payroll/readme|README.md]]
 - [[docs/docs/roadmap|ROADMAP.md]]
 - [[docs/readme|README.md]]

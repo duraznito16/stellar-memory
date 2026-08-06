@@ -4,8 +4,8 @@ kind: doc
 title: stellar-builder.md
 path: templates/agents/stellar-builder.md
 summary: "--- name: stellar-builder description: Use to write or change Soroban contract code in this project — adding an entry point, changing storage, wiring a cross-contract call, fixing a diagnosed bug. The only agent that edits contracts. Have the explorer or debugger establish context first."
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/doc

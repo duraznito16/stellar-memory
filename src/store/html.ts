@@ -1013,7 +1013,13 @@ const DETAIL = ${d.detail};
 const WARN_ICON = '${ICON_WARN}';
 const NOTE_ICON = '${ICON_NOTE}';
 const panel = document.getElementById('panel');
-const svg = document.querySelector('svg');
+// Qualified, and it has to stay that way. The legend and the findings list draw
+// their glyphs as inline <svg class="ic">, and those come first in the document,
+// so a bare querySelector('svg') returns a 16px icon. Nothing then throws —
+// querySelectorAll('.node') on an icon is simply empty — so every click handler
+// below is attached to nothing and the page looks perfectly fine until you
+// click it.
+const svg = document.querySelector('svg.graph');
 const EDGES = Array.from(svg.querySelectorAll('.edge'));
 const NODES = new Map(Array.from(svg.querySelectorAll('.node')).map(n => [n.dataset.id, n]));
 let selected = null;

@@ -4,8 +4,8 @@ kind: crate
 title: treasury
 path: demo/private-payroll/contracts/treasury/Cargo.toml
 summary: Holds company funds and releases them to the payroll contract.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/crate

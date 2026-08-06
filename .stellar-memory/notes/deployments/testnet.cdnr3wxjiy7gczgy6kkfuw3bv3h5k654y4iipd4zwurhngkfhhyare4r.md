@@ -3,19 +3,43 @@ id: deployment:testnet.CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R
 kind: deployment
 title: treasury @ testnet
 summary: Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R`.
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/deployment
-stale: true
-stale_since: 2026-08-06
 ---
 
 <!-- stellar-memory:auto -->
-> [!warning] No longer present
-> This was last seen in the project on 2026-08-06T18:12:12.243Z.
-> The scan on 2026-08-06 did not find it. Your own notes below are preserved.
+# treasury @ testnet
+
+Live at `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R`.
+
+## On-chain
+
+- **Network:** `testnet`
+- **Contract ID:** `CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R`
+- **Alias:** `treasury`
+- **Deployed Wasm hash:** `22061e7106ce20126772b4eeb87a729239b27673a8e146228b630b958f5b235c`
+- **Drift:** not checked — the deployed Wasm was never compared with a local build, so whether they agree is unknown.
+
+### Build metadata
+
+- `rsver`: 1.97.1
+- `rssdkver`: 22.0.11#34f7f53ae31e0fd02aab436a9872e79fa671ca02
+
+## Connections
+
+**Source contract**
+- [[contracts/treasury|Treasury]]
+
+---
+
+<details><summary>Where this came from</summary>
+
+- Reported by `stellar contract fetch --id CDNR3WXJIY7GCZGY6KKFUW3BV3H5K654Y4IIPD4ZWURHNGKFHHYARE4R` on `testnet` (ground truth)
+
+</details>
 <!-- /stellar-memory:auto -->
 
 ## Notes

@@ -4,8 +4,8 @@ kind: doc
 title: memory-vault.md
 path: .claude/agents/memory-vault.md
 summary: "--- name: memory-vault description: Use for the vault format — Markdown note rendering, frontmatter, wikilinks, note paths, staleness handling, and the index.json schema. Owns src/store/*.ts and src/core/types.ts. Use it when changing what a note looks like or how the graph is persisted."
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/doc

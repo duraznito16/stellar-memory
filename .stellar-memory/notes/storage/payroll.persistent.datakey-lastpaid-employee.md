@@ -3,8 +3,8 @@ id: storage:Payroll.persistent.DataKey::LastPaid(employee)
 kind: storage
 title: DataKey::LastPaid(employee) (persistent)
 path: demo/private-payroll/contracts/payroll/src/lib.rs
-first_seen: 2026-08-06T18:12:12.243Z
-last_changed: 2026-08-06T18:12:12.243Z
+first_seen: 2026-08-06T23:14:26.277Z
+last_changed: 2026-08-06T23:14:26.277Z
 tags:
   - stellar-memory
   - kind/storage
