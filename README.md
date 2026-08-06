@@ -208,6 +208,48 @@ itself, which matters because what it publishes is a map of your source tree and
 conference Wi-Fi is not your machine. Nothing is written to the project: the page
 is a string in memory, so `--watch` cannot end up watching its own output.
 
+### What `--watch` looks like
+
+The demo ships `set_pay_token` with a real defect and a `FIXME` admitting it:
+the function rewrites which token salaries are paid in, and never checks who is
+asking. `stellar memory ui --watch` is running; nothing else is.
+
+**Before** — six findings, one of them that function:
+
+![The window before the edit: Worth knowing 6, listing the missing require_auth on Payroll.set_pay_token](docs/media/watch-before.png)
+
+Add the check the FIXME asks for — read the admin out of instance storage and
+require its authorization — and **save**. No command is run:
+
+```rust
+let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+admin.require_auth();
+```
+
+**After** — five:
+
+![The window after saving: Worth knowing 5, the set_pay_token finding gone](docs/media/watch-after.png)
+
+The finding did not merely disappear. In the page's own data the function went
+from
+
+```json
+"findings": [{ "severity": "warn", "category": "auth",
+  "message": "Payroll.set_pay_token writes state but never calls require_auth." }]
+```
+
+to
+
+```json
+"findings": [],
+"links": [{ "kind": "reads", "other": "DataKey::Admin (instance)" }]
+```
+
+It recognised *why* the code is now safe: authority read from storage is a gate
+that binds the caller, where authority taken as a parameter is not. That
+distinction is the difference between an access-control check and a decoration,
+and it is the reason this cannot be a boolean.
+
 ```bash
 stellar memory graph --format html
 ```
