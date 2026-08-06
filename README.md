@@ -134,6 +134,8 @@ regenerates rather than accumulates.
 
 ## See it
 
+![The demo project as a graph: three contracts, their storage, and what is live on testnet](docs/media/graph.png)
+
 ```bash
 stellar memory graph --format html
 ```

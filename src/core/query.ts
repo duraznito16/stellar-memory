@@ -72,10 +72,43 @@ export interface SearchHit {
  * match beats prefix match beats substring beats a hit in the summary or path.
  * No embeddings, so it works offline and its behaviour is predictable.
  */
+/**
+ * Words that carry no signal in a question about a codebase. Without this,
+ * "how does payment work" scores every node containing "work" or "does", and
+ * the answer is dominated by whatever kind happens to carry a bonus.
+ */
+const STOPWORDS = new Set([
+  'how', 'does', 'do', 'is', 'are', 'was', 'the', 'a', 'an', 'of', 'in', 'on',
+  'to', 'for', 'and', 'or', 'what', 'which', 'where', 'when', 'why', 'who',
+  'work', 'works', 'used', 'use', 'uses', 'this', 'that', 'it', 'its', 'with',
+  'can', 'i', 'we', 'me', 'my', 'you', 'about', 'into', 'from', 'by', 'be',
+]);
+
+/**
+ * How useful each kind is as the answer to a question about how a project
+ * works. A contract or a function explains something; a deployment address is
+ * a fact you look up once you know what you are looking at.
+ */
+const KIND_WEIGHT: Partial<Record<NodeKind, number>> = {
+  contract: 10,
+  function: 8,
+  storage: 5,
+  event: 4,
+  error: 4,
+  type: 3,
+  asset: 3,
+  crate: 2,
+  deployment: 1,
+};
+
 export function search(memory: ProjectMemory, query: string, limit = 20): SearchHit[] {
   const needle = query.toLowerCase().trim();
   if (!needle) return [];
-  const terms = needle.split(/\s+/).filter((t) => t.length > 1);
+  const allTerms = needle.split(/\s+/).filter((t) => t.length > 1);
+  const meaningful = allTerms.filter((t) => !STOPWORDS.has(t));
+  // If the question is nothing but stopwords, fall back to them rather than
+  // matching nothing at all.
+  const terms = meaningful.length > 0 ? meaningful : allTerms;
 
   const hits: SearchHit[] = [];
   for (const node of memory.nodes) {
@@ -114,8 +147,10 @@ export function search(memory: ProjectMemory, query: string, limit = 20): Search
       }
     }
 
-    // Contracts and deployments are what people usually mean.
-    if (score > 0 && (node.kind === 'contract' || node.kind === 'deployment')) score += 8;
+    // Break ties toward the kinds that answer a question rather than record a
+    // fact. Only ever a tiebreak: a weak match on a contract must not outrank a
+    // strong match on a storage key.
+    if (score > 0) score += KIND_WEIGHT[node.kind] ?? 0;
 
     if (score > 0) hits.push({ node, score, reason: reason || 'partial match' });
   }

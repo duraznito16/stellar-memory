@@ -148,9 +148,15 @@ function layout(nodes: Placed[], edges: MemoryEdge[]): void {
       const p = nodes[i]!;
       p.x += (dx[i]! / dist) * move;
       p.y += (dy[i]! / dist) * move;
-      const pad = p.group.radius + 14;
-      p.x = Math.min(WIDTH - pad, Math.max(pad, p.x));
-      p.y = Math.min(HEIGHT - pad, Math.max(pad, p.y));
+      // Labelled nodes need room for the text, not just the mark. Without the
+      // wider horizontal margin a deployment near the edge has its name clipped
+      // by the canvas — the label is centred on the node, so half of it hangs
+      // outside.
+      const labelled = p.group.id === 'contract' || p.group.id === 'onchain';
+      const padX = labelled ? Math.max(p.group.radius + 14, 82) : p.group.radius + 14;
+      const padY = p.group.radius + (labelled ? 26 : 14);
+      p.x = Math.min(WIDTH - padX, Math.max(padX, p.x));
+      p.y = Math.min(HEIGHT - padY, Math.max(padY, p.y));
     }
   }
 }
@@ -218,16 +224,22 @@ export function renderGraphHtml(memory: ProjectMemory, signals: Signal[]): strin
             ? `<path d="M ${n2(p.x)} ${n2(p.y - r * 1.25)} L ${n2(p.x + r * 1.25)} ${n2(p.y)} L ${n2(p.x)} ${n2(p.y + r * 1.25)} L ${n2(p.x - r * 1.25)} ${n2(p.y)} Z" />`
             : `<circle cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r)}" />`;
 
-      // The ring marks a finding; the panel names it. Colour never carries the
-      // meaning on its own.
+      // A finding needs a mark that survives a small node on a light surface and
+      // a greyscale print. The status yellow alone does not — it sits below 3:1
+      // on light by design — so the ring is thick and dashed, and a glyph sits
+      // beside it. Shape and symbol carry the meaning; colour only reinforces it.
       const ring =
         p.severity === 'warn'
-          ? `<circle class="ring ring--warn" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r + 5)}" />`
+          ? `<circle class="ring ring--warn" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${n2(r + 5)}" />` +
+            `<text class="flag" x="${n2(p.x + r + 5)}" y="${n2(p.y - r - 3)}">!</text>`
           : '';
 
+      // Contracts and on-chain nodes are few and are the ones a reader is
+      // looking for by name. Functions and storage keys are not labelled: at
+      // this density the labels would collide and hide the structure.
       const label =
-        p.group.id === 'contract'
-          ? `<text class="node-label" x="${n2(p.x)}" y="${n2(p.y + r + 15)}">${esc(p.node.title)}</text>`
+        p.group.id === 'contract' || p.group.id === 'onchain'
+          ? `<text class="node-label node-label--${p.group.id}" x="${n2(p.x)}" y="${n2(p.y + r + 15)}">${esc(p.node.title)}</text>`
           : '';
 
       return `<g class="node node--${p.group.id}" tabindex="0" role="listitem" data-id="${esc(p.node.id)}" aria-label="${esc(p.node.title)}, ${esc(p.node.kind)}">${ring}${shape}${label}<title>${esc(p.node.title)} (${esc(p.node.kind)})</title></g>`;
@@ -371,7 +383,7 @@ const PAGE = (d: PageData): string => `<!doctype html>
   .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
   .swatch--square { border-radius: 2px; }
   .swatch--diamond { border-radius: 2px; transform: rotate(45deg); }
-  .swatch--ring { background: none; border: 2px solid var(--status-warning); }
+  .swatch--ring { background: none; border: 2px dashed var(--status-critical); }
 
   .board { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 18px; align-items: start; }
   @media (max-width: 940px) { .board { grid-template-columns: 1fr; } }
@@ -400,8 +412,17 @@ const PAGE = (d: PageData): string => `<!doctype html>
   .node:focus { outline: none; }
   .node.is-selected > rect, .node.is-selected > circle, .node.is-selected > path { stroke: var(--text-primary); stroke-width: 3; }
 
-  .ring { fill: none; stroke-width: 2; }
-  .ring--warn { stroke: var(--status-warning); }
+  .ring { fill: none; stroke-width: 3; stroke-dasharray: 3 2.5; }
+  .ring--warn { stroke: var(--status-critical); }
+
+  .flag {
+    font: 700 13px system-ui, sans-serif;
+    fill: var(--status-critical);
+    paint-order: stroke;
+    stroke: var(--surface-1);
+    stroke-width: 3;
+    pointer-events: none;
+  }
 
   .node-label {
     font: 600 12px system-ui, sans-serif;
@@ -412,6 +433,7 @@ const PAGE = (d: PageData): string => `<!doctype html>
     stroke-width: 3.5;
     pointer-events: none;
   }
+  .node-label--onchain { font-weight: 500; font-size: 11px; fill: var(--text-secondary); }
 
   .panel {
     background: var(--surface-1);

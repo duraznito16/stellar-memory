@@ -113,6 +113,17 @@ function translate(error: unknown): Error {
   const status = (error as { status?: number })?.status;
   const message = error instanceof Error ? error.message : String(error);
 
+  // Missing credentials fail when the client is constructed, before any request,
+  // so there is no status code to match on. This is the most likely failure of
+  // all — most people run this without a key — and it deserves the instructions
+  // rather than the SDK's internal wording.
+  if (/authentication method|apiKey|authToken/i.test(message) && status === undefined) {
+    return new AiUnavailable(
+      'No Anthropic credentials found. Set ANTHROPIC_API_KEY, or run `ant auth login`. ' +
+        'Without --ai the same question is answered from the local index.',
+    );
+  }
+
   if (status === 401) {
     return new AiUnavailable(
       'No usable Anthropic credentials. Set ANTHROPIC_API_KEY, or run `ant auth login`. ' +
