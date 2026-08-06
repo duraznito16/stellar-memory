@@ -38,6 +38,7 @@ import {
   type CrateManifest,
 } from './cargo.js';
 import {
+  cliUnavailableWarning,
   describeCommand,
   fetchInterface,
   fetchWasmHash,
@@ -526,7 +527,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanOutcome> {
   if (options.online) {
     const version = await stellarVersion();
     if (!version) {
-      warnings.push('The `stellar` CLI was not found on PATH, so no on-chain data was collected.');
+      warnings.push(cliUnavailableWarning());
     } else {
       progress(`Checking deployments via ${version}`);
       enriched = true;

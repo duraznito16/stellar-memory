@@ -70,6 +70,17 @@ export interface ParsedSpec {
   errors: SpecUdt[];
 }
 
+/**
+ * Read a spec into the shape the rest of the tool relies on.
+ *
+ * The casts this replaced were promises, not checks. Real CLI output does carry
+ * `"inputs": []` for a niladic function, but a spec that omits its empty arrays
+ * — an older CLI, a hand-written fixture, a stored interface — made
+ * `fn.inputs.map` throw a TypeError deep inside rendering, well outside the
+ * `try` in `fetchInterface`, which took down the whole scan instead of
+ * degrading to "no interface". Everything a consumer iterates is guaranteed to
+ * be an array here.
+ */
 export function parseSpec(entries: unknown): ParsedSpec {
   const out: ParsedSpec = {
     functions: [], events: [], structs: [], enums: [], unions: [], errors: [],
@@ -79,13 +90,72 @@ export function parseSpec(entries: unknown): ParsedSpec {
   for (const entry of entries) {
     if (!entry || typeof entry !== 'object') continue;
     const e = entry as Record<string, unknown>;
-    if (e.function_v0) out.functions.push(e.function_v0 as SpecFunction);
-    else if (e.event_v0) out.events.push(e.event_v0 as SpecEvent);
-    else if (e.udt_struct_v0) out.structs.push(e.udt_struct_v0 as SpecUdt);
-    else if (e.udt_enum_v0) out.enums.push(e.udt_enum_v0 as SpecUdt);
-    else if (e.udt_union_v0) out.unions.push(e.udt_union_v0 as SpecUdt);
-    else if (e.udt_error_enum_v0) out.errors.push(e.udt_error_enum_v0 as SpecUdt);
+    if (e.function_v0) push(out.functions, asFunction(e.function_v0));
+    else if (e.event_v0) push(out.events, asEvent(e.event_v0));
+    else if (e.udt_struct_v0) push(out.structs, asUdt(e.udt_struct_v0));
+    else if (e.udt_enum_v0) push(out.enums, asUdt(e.udt_enum_v0));
+    else if (e.udt_union_v0) push(out.unions, asUdt(e.udt_union_v0));
+    else if (e.udt_error_enum_v0) push(out.errors, asUdt(e.udt_error_enum_v0));
   }
+  return out;
+}
+
+function push<T>(into: T[], value: T | null): void {
+  if (value) into.push(value);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Params keep their position: dropping an unnamed one would misstate the arity. */
+function asParams(value: unknown): SpecParam[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((raw, i) => {
+    const p = asRecord(raw) ?? {};
+    return {
+      ...p,
+      name: typeof p.name === 'string' ? p.name : `arg${i}`,
+    } as SpecParam;
+  });
+}
+
+function asFunction(value: unknown): SpecFunction | null {
+  const fn = asRecord(value);
+  if (!fn || typeof fn.name !== 'string') return null;
+  return {
+    ...fn,
+    name: fn.name,
+    inputs: asParams(fn.inputs),
+    outputs: Array.isArray(fn.outputs) ? (fn.outputs as SpecType[]) : [],
+  } as SpecFunction;
+}
+
+function asEvent(value: unknown): SpecEvent | null {
+  const ev = asRecord(value);
+  if (!ev || typeof ev.name !== 'string') return null;
+  return {
+    ...ev,
+    name: ev.name,
+    prefix_topics: Array.isArray(ev.prefix_topics)
+      ? ev.prefix_topics.filter((t): t is string => typeof t === 'string')
+      : [],
+    params: asParams(ev.params),
+  } as SpecEvent;
+}
+
+function asUdt(value: unknown): SpecUdt | null {
+  const udt = asRecord(value);
+  if (!udt || typeof udt.name !== 'string') return null;
+  const out: SpecUdt = { ...udt, name: udt.name } as SpecUdt;
+  // `cases` and `fields` are optional in the spec, so absent stays absent —
+  // but present and not an array is corrupt, and reads as absent too.
+  out.cases = Array.isArray(udt.cases)
+    ? (udt.cases.filter((c) => !!asRecord(c)) as SpecErrorCase[])
+    : undefined;
+  out.fields = Array.isArray(udt.fields) ? udt.fields : undefined;
   return out;
 }
 
@@ -123,13 +193,18 @@ export function formatSpecType(type: SpecType | undefined): string {
 }
 
 export function formatSignature(fn: SpecFunction): string {
-  const params = fn.inputs.map((i) => `${i.name}: ${formatSpecType(i.type_)}`).join(', ');
-  const outputs = fn.outputs ?? [];
+  // Exported, so it is also reached with specs that never passed through
+  // parseSpec — a stored interface, a fixture. The `?? []` on outputs showed
+  // the case had been thought about; inputs got the same guard the day one
+  // arrived without them and the TypeError ended the scan.
+  const inputs = Array.isArray(fn?.inputs) ? fn.inputs : [];
+  const params = inputs.map((i) => `${i?.name ?? '_'}: ${formatSpecType(i?.type_)}`).join(', ');
+  const outputs = Array.isArray(fn?.outputs) ? fn.outputs : [];
   const ret =
     outputs.length === 0
       ? ''
       : ` -> ${outputs.length === 1 ? formatSpecType(outputs[0]) : `(${outputs.map(formatSpecType).join(', ')})`}`;
-  return `${fn.name}(${params})${ret}`;
+  return `${fn?.name ?? 'unknown'}(${params})${ret}`;
 }
 
 /** First line of the doc comment, which is usually the useful summary. */

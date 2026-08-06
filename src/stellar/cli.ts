@@ -22,6 +22,8 @@ export interface RunResult {
   stderr: string;
   /** Set when the process could not be started at all. */
   spawnError?: string;
+  /** The process did start, but was killed when the timeout expired. */
+  timedOut?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -45,24 +47,112 @@ export function runStellar(args: string[], options: RunOptions = {}): Promise<Ru
         env: env ? { ...process.env, ...env } : process.env,
       },
       (error, stdout, stderr) => {
-        if (error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        const err = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
+        if (err && err.code === 'ENOENT') {
           resolve({ ok: false, stdout: '', stderr: '', spawnError: 'stellar CLI not found on PATH' });
           return;
         }
-        resolve({ ok: !error, stdout: stdout ?? '', stderr: stderr ?? '', spawnError: undefined });
+        resolve({
+          ok: !error,
+          stdout: stdout ?? '',
+          stderr: stderr ?? '',
+          spawnError: undefined,
+          // Node kills the child at the timeout; that reads very differently
+          // from a CLI that answered and said no.
+          timedOut: err?.killed === true ? true : undefined,
+        });
       },
     );
   });
 }
 
-let cachedVersion: string | null | undefined;
+const PROBE_TIMEOUT_MS = 10_000;
+
+export interface CliProbe {
+  /** First line of `stellar --version`, or null when we could not read one. */
+  version: string | null;
+  /** True only for ENOENT: nothing named `stellar` is on PATH. */
+  missing: boolean;
+  /** Why the probe came back empty, when it did. */
+  detail?: string;
+}
+
+export type StellarRunner = (args: string[], options?: RunOptions) => Promise<RunResult>;
+
+let probeInFlight: Promise<CliProbe> | null = null;
+let lastProbe: CliProbe | null = null;
+
+/**
+ * Ask the CLI what it is, once.
+ *
+ * Two things this deliberately does not do. It does not cache a transient
+ * failure: a cold disk, an antivirus scanning a fresh binary, or the first
+ * invocation after boot can all blow through the timeout, and the MCP server is
+ * a long-lived process — caching that answer would drop the on-chain half for
+ * the rest of the process's life over a slow read that already recovered. And
+ * it does not flatten "no such binary" into "something went wrong": only ENOENT
+ * means the CLI is absent, and only ENOENT should be reported that way.
+ *
+ * Success and ENOENT are both settled facts and are cached. What is cached is
+ * the promise, not the result, so concurrent callers share one spawn.
+ */
+export function probeStellarCli(run: StellarRunner = runStellar): Promise<CliProbe> {
+  if (probeInFlight) return probeInFlight;
+  const probe = run(['--version'], { timeoutMs: PROBE_TIMEOUT_MS })
+    .then(readProbe, (err: unknown) => ({
+      version: null,
+      missing: false,
+      detail: err instanceof Error ? err.message : 'the probe itself failed',
+    }))
+    .then((result) => {
+      lastProbe = result;
+      if (result.version === null && !result.missing) probeInFlight = null;
+      return result;
+    });
+  probeInFlight = probe;
+  return probe;
+}
+
+function readProbe(res: RunResult): CliProbe {
+  if (res.ok) {
+    const version = res.stdout.trim().split('\n')[0]?.trim();
+    if (version) return { version, missing: false };
+    return { version: null, missing: false, detail: '`--version` printed nothing' };
+  }
+  if (res.spawnError) return { version: null, missing: true, detail: res.spawnError };
+  if (res.timedOut) {
+    return { version: null, missing: false, detail: `no answer within ${PROBE_TIMEOUT_MS / 1000}s` };
+  }
+  const firstLine = res.stderr.trim().split('\n')[0]?.trim();
+  return {
+    version: null,
+    missing: false,
+    detail: firstLine ? firstLine.slice(0, 120) : '`--version` exited with an error',
+  };
+}
 
 /** The installed CLI version, or null when the CLI is unavailable. */
 export async function stellarVersion(): Promise<string | null> {
-  if (cachedVersion !== undefined) return cachedVersion;
-  const res = await runStellar(['--version'], { timeoutMs: 10_000 });
-  cachedVersion = res.ok ? res.stdout.trim().split('\n')[0] ?? null : null;
-  return cachedVersion;
+  return (await probeStellarCli()).version;
+}
+
+/**
+ * How to explain a scan that collected nothing on-chain. Says "not found on
+ * PATH" only when the binary really was not there; a probe that timed out gets
+ * told as the transient thing it is, because the next scan will retry it.
+ */
+export function cliUnavailableWarning(probe: CliProbe | null = lastProbe): string {
+  if (probe && !probe.missing) {
+    const why = probe.detail ? ` (${probe.detail})` : '';
+    return `The \`stellar\` CLI was found but did not answer \`--version\`${why}, so no on-chain data was collected. That failure was not cached; the next scan tries again.`;
+  }
+  return 'The `stellar` CLI was not found on PATH, so no on-chain data was collected.';
+}
+
+/** Forget the probe: for tests, and for a long-lived process whose PATH changed. */
+export function resetCliProbe(): void {
+  probeInFlight = null;
+  lastProbe = null;
 }
 
 export interface ContractRef {
@@ -170,13 +260,24 @@ export async function listAliases(network: string, cwd?: string): Promise<AliasE
   return [...found.values()];
 }
 
-/** Both the project-local store and the CLI's global config directory. */
-function aliasDirectories(cwd?: string): string[] {
+/**
+ * Both the project-local store and the CLI's global config directory.
+ *
+ * Exported because which directories were consulted is the whole answer to "why
+ * did it not see my alias?", and that deserves to be testable.
+ */
+export function aliasDirectories(cwd?: string): string[] {
   const dirs: string[] = [];
   if (cwd) dirs.push(path.join(cwd, '.stellar', 'contract-ids'));
 
-  const configHome =
-    process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config');
+  // `??` would keep an empty XDG_CONFIG_HOME, and minimal Docker images and
+  // some CI runners do export it empty. That turned the global alias store into
+  // the relative path `stellar/contract-ids`, resolved against whatever the
+  // process's cwd happened to be — where readAliasDir swallowed the ENOENT and
+  // every global alias vanished without a word. Anything that is not an
+  // absolute path is not a config home.
+  const xdg = process.env.XDG_CONFIG_HOME?.trim();
+  const configHome = xdg && path.isAbsolute(xdg) ? xdg : path.join(os.homedir(), '.config');
   dirs.push(path.join(configHome, 'stellar', 'contract-ids'));
   return dirs;
 }
