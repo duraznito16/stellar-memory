@@ -34,6 +34,7 @@ import {
   architecture,
   contextDigest,
   neighbourhood,
+  driftState,
   missingTtlExtension,
   nodesOfKind,
   resumeReport,
@@ -397,7 +398,15 @@ export async function runMcp(options: McpOptions): Promise<void> {
                   .object({
                     network: z.string().optional(),
                     contract_id: z.string().optional(),
-                    matches_local_build: z.string().optional(),
+                    drift: z
+                      .string()
+                      .describe(
+                        "'in-sync', 'stale', or 'unknown'. Unknown means the comparison never ran — it is not a synonym for fine.",
+                      ),
+                    matches_local_build: z
+                      .boolean()
+                      .nullable()
+                      .describe('True only when the hashes were compared and agreed; null when no comparison happened.'),
                   })
                   .passthrough(),
               ),
@@ -457,10 +466,17 @@ export async function runMcp(options: McpOptions): Promise<void> {
           tested_by: c.tests.map((n) => n.path ?? n.title),
           deployments: c.deployments.map((d) => {
             const data = d.data as unknown as DeploymentData | undefined;
+            const drift = driftState(data?.drift);
             return {
               network: data?.network,
               contract_id: data?.contractId,
-              matches_local_build: data?.drift,
+              drift,
+              // The name reads as a predicate and used to carry the tri-state
+              // string, so an agent testing it got `true` for "stale" and for
+              // "unknown" alike — a build that provably differs and one that
+              // was never compared, both reported as agreement. It is true
+              // only when the comparison ran and the hashes matched.
+              matches_local_build: drift === 'unknown' ? null : drift === 'in-sync',
             };
           }),
         })),

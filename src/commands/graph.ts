@@ -1,7 +1,15 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { tryLoadMemory } from '../store/vault.js';
-import { architecture, neighbourhood, nodesOfKind, search, signals } from '../core/query.js';
+import {
+  DRIFT_LABEL,
+  architecture,
+  driftState,
+  neighbourhood,
+  nodesOfKind,
+  search,
+  signals,
+} from '../core/query.js';
 import { renderGraphHtml } from '../store/html.js';
 import type { DeploymentData, MemoryNode, ProjectMemory } from '../core/types.js';
 import { out, note, success, warn, fail, dim, bold, cyan, green, yellow } from '../ui/out.js';
@@ -116,7 +124,15 @@ function renderTree(memory: ProjectMemory): string {
     const deployments = contract.deployments
       .map((d) => {
         const data = d.data as unknown as DeploymentData | undefined;
-        const mark = data?.drift === 'stale' ? yellow('stale') : green('in sync');
+        const state = driftState(data?.drift);
+        // The unchecked state is deliberately uncoloured: green here read as a
+        // verified match for every deployment whose hash was never fetched.
+        const mark =
+          state === 'stale'
+            ? yellow(DRIFT_LABEL.stale)
+            : state === 'in-sync'
+              ? green(DRIFT_LABEL['in-sync'])
+              : DRIFT_LABEL.unknown;
         return `${data?.network} ${dim(`(${mark})`)}`;
       })
       .join(', ');

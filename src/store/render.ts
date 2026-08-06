@@ -17,7 +17,7 @@ import type {
   ProjectMemory,
   StorageData,
 } from '../core/types.js';
-import { missingTtlExtension } from '../core/query.js';
+import { DRIFT_LABEL, driftState, missingTtlExtension } from '../core/query.js';
 import { wikilink } from './keys.js';
 
 export interface RenderContext {
@@ -240,12 +240,19 @@ function renderDeployment(node: MemoryNode): string {
   ];
   if (data.alias) lines.push(`- **Alias:** \`${data.alias}\``);
   if (data.onChainWasmHash) lines.push(`- **Deployed Wasm hash:** \`${data.onChainWasmHash}\``);
-  if (data.drift === 'stale') {
+  // Silence used to stand for the unchecked state, which a reader takes for "no
+  // news", and the same node read "in sync" on the graph at the same time.
+  const state = driftState(data.drift);
+  if (state === 'stale') {
     lines.push(
       '- ⚠️ **Drift:** the Wasm deployed here does not match your local build. What runs on this network is older than your source.',
     );
-  } else if (data.drift === 'in-sync') {
+  } else if (state === 'in-sync') {
     lines.push('- ✅ **Drift:** deployed Wasm matches the local build.');
+  } else {
+    lines.push(
+      `- **Drift:** ${DRIFT_LABEL.unknown} — the deployed Wasm was never compared with a local build, so whether they agree is unknown.`,
+    );
   }
   if (data.meta && Object.keys(data.meta).length > 0) {
     lines.push('', '### Build metadata', '');

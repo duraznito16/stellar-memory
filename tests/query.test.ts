@@ -5,7 +5,9 @@
  * read the same nodes, so a question with one answer in the index must not come
  * out with two. Each test here is one place they were found to disagree — a
  * warning on a note that the gate exited zero on, a search whose only miss was
- * the thing it was asked for, an age that rounded eleven months down to today.
+ * the thing it was asked for, an age that rounded eleven months down to today,
+ * a deployment the graph called "in sync" that had never been compared to
+ * anything.
  *
  * Against `src`, not `dist`: these are properties of the reading code itself.
  */
@@ -13,15 +15,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
+import { promises as fs } from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 register('./src-specifiers.mjs', import.meta.url);
 
-const { missingTtlExtension, search, signals } = await import('../src/core/query.ts');
+const { driftState, missingTtlExtension, search, signals } = await import('../src/core/query.ts');
 const { renderNoteBody } = await import('../src/store/render.ts');
 const { humanAge } = await import('../src/core/git.ts');
 const { loadMemory } = await import('../src/store/vault.ts');
+const { runGraph } = await import('../src/commands/graph.ts');
+const { runResume } = await import('../src/commands/resume.ts');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // The demo's own vault: a real project's nodes, with the storage shapes and the
@@ -99,6 +105,76 @@ test('an instance key with no extend_ttl is not a finding on any surface', () =>
     }),
     false,
   );
+});
+
+/* ------------------------------------------------------------------ *
+ * Drift: the three states
+ * ------------------------------------------------------------------ */
+
+/** picocolors decides from the terminal, and on Windows it decides yes on a pipe. */
+const ESCAPES = new RegExp(`${String.fromCharCode(27)}\\[\\d+m`, 'g');
+const plain = (text: string) => text.replace(ESCAPES, '');
+
+/** `resume` writes its briefing to stdout and takes no sink. */
+async function captureOut(run: () => Promise<void>): Promise<string> {
+  const chunks: string[] = [];
+  const real = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    await run();
+  } finally {
+    process.stdout.write = real;
+  }
+  return plain(chunks.join(''));
+}
+
+test('a drift check that never ran is not reported as agreement', async (t) => {
+  // `unknown` means one of the two Wasm hashes was missing and nothing was
+  // compared. Every surface branched on `=== 'stale'` and painted the remainder
+  // green, so with the hash read gone the graph reported `testnet (in sync)` for
+  // all three demo contracts — the treasury among them, which is genuinely out
+  // of sync. This is the demo's own vault with the hashes taken back off it,
+  // which is exactly the shape a scan produces when the CLI cannot answer.
+  const raw = JSON.parse(
+    await fs.readFile(path.join(here, '..', 'demo', 'private-payroll', '.stellar-memory', 'index.json'), 'utf8'),
+  ) as { nodes: { kind: string; data?: Record<string, unknown> }[] };
+
+  for (const node of raw.nodes) {
+    if (node.kind !== 'deployment' || !node.data) continue;
+    node.data.drift = 'unknown';
+    delete node.data.onChainWasmHash;
+  }
+
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'stellar-memory-drift-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, '.stellar-memory'));
+  await fs.writeFile(path.join(root, '.stellar-memory', 'index.json'), JSON.stringify(raw), 'utf8');
+
+  await runGraph({ cwd: root, out: 'graph.txt' });
+  const tree = await fs.readFile(path.join(root, 'graph.txt'), 'utf8');
+  assert.match(tree, /on-chain {2}testnet \(not checked\)/, 'the tree says the check did not run');
+  assert.doesNotMatch(tree, /in sync/, 'and never claims a match it did not verify');
+
+  const briefing = await captureOut(() => runResume({ cwd: root }));
+  assert.match(briefing, /not checked — no on-chain hash to compare/);
+  assert.doesNotMatch(briefing, /matches local build/);
+
+  const deployment = memory.nodes.find((n) => n.kind === 'deployment');
+  assert.ok(deployment, 'the demo is deployed somewhere, or this proves nothing');
+  const body = noteBody({ ...deployment, data: { ...deployment.data, drift: 'unknown' } });
+  assert.match(body, /\*\*Drift:\*\* not checked/, 'the note says so too, rather than nothing');
+  assert.doesNotMatch(body, /matches the local build/);
+});
+
+test('a deployment carrying no drift at all is unchecked, not in sync', () => {
+  // An offline scan records the deployment and never writes the field. Absence
+  // is the same claim as `unknown`, said by omission.
+  assert.equal(driftState(undefined), 'unknown');
+  assert.equal(driftState('in-sync'), 'in-sync');
+  assert.equal(driftState('stale'), 'stale');
 });
 
 /* ------------------------------------------------------------------ *

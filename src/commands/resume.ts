@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { tryLoadMemory } from '../store/vault.js';
-import { resumeReport } from '../core/query.js';
+import { DRIFT_LABEL, resumeReport } from '../core/query.js';
 import { readGitInfo, humanAge } from '../core/git.js';
 import { out, heading, subheading, dim, bold, green, yellow, cyan, warn, rule } from '../ui/out.js';
 
@@ -90,12 +90,19 @@ export async function runResume(options: ResumeOptions): Promise<void> {
     subheading('On-chain');
     for (const deployment of report.deployments) {
       const id = `${deployment.contractId.slice(0, 6)}…${deployment.contractId.slice(-4)}`;
+      // An unlinked deployment is somebody else's contract: there is no local
+      // build to compare it against, which is a different fact from a comparison
+      // that was meant to happen and did not.
       const state =
         deployment.drift === 'stale'
           ? yellow('out of sync with local source')
           : deployment.drift === 'in-sync'
             ? green('matches local build')
-            : dim(deployment.linked ? 'build state unknown' : 'external dependency');
+            : dim(
+                deployment.linked
+                  ? `${DRIFT_LABEL.unknown} — no on-chain hash to compare`
+                  : 'external dependency',
+              );
       out(`  ${cyan((deployment.alias ?? id).padEnd(22))} ${dim(deployment.network.padEnd(9))} ${state}`);
       out(`  ${dim(' '.repeat(22))} ${dim(deployment.contractId)}`);
     }
