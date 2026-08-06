@@ -110,6 +110,44 @@ The server exposes `project_overview`, `search_memory`, `describe_node`,
 `recent_changes` — so an agent can orient itself in a Soroban codebase before
 touching it, instead of grepping blindly.
 
+### What that buys, concretely
+
+An agent asked *"could this contract ever pay an employee twice?"* answers it in
+four calls, without opening a single file. Every response below is real output
+from the demo workspace in this repo:
+
+**1.** `project_signals` — start from what the project already knows is wrong:
+
+```json
+{ "severity": "warn", "category": "ttl",
+  "message": "Persistent key DataKey::LastPaid(employee) is never given an extend_ttl; it can expire and become unreachable.",
+  "nodeId": "storage:Payroll.persistent.DataKey::LastPaid(employee)" }
+```
+
+**2.** `storage_layout` — who depends on that key:
+
+```json
+{ "key": "DataKey::LastPaid(employee)", "durability": "persistent",
+  "ttl_extended": false, "read_by": ["last_paid"], "written_by": ["pay"] }
+```
+
+**3.** `describe_node {"id":"function:Payroll.pay"}` — what `pay` actually does:
+
+```
+Payroll.pay -> EmployeeRegistry   calls `salary_of` — address from `DataKey::Registry`
+Payroll.pay -> Treasury           calls `withdraw`  — address from `DataKey::Treasury`
+```
+
+**4.** The conclusion, which no single fact contains: `pay` writes `LastPaid` and
+guards on it, the key is **persistent with no `extend_ttl`**, and `pay` moves
+real funds through `Treasury.withdraw`. When that entry expires, the guard reads
+as *never paid* — and the same salary goes out twice. It is not a logic bug; the
+code is correct until Soroban's TTL rules delete the state it relies on.
+
+That chain is the argument for the whole tool. Each step is a lookup, not an
+inference, and an agent grepping `.rs` files would find the `if` statement and
+conclude the contract was safe.
+
 ## It ships the agents, not just the data
 
 ```bash
