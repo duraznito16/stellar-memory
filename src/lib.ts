@@ -18,9 +18,12 @@ export type { ScanOptions, ScanOutcome } from './scanner/scan.js';
 export { VAULT_DIR, findVaultRoot, loadMemory, tryLoadMemory, vaultPath } from './store/vault.js';
 
 export {
+  DRIFT_LABEL,
   SIGNAL_CATEGORIES,
   architecture,
   contextDigest,
+  driftState,
+  missingTtlExtension,
   neighbourhood,
   resumeReport,
   search,
@@ -28,6 +31,7 @@ export {
 } from './core/query.js';
 export type {
   ArchitectureView,
+  DriftState,
   Neighbourhood,
   ResumeReport,
   SearchHit,
